@@ -24,22 +24,22 @@ authRoutes.get("/login-options", (_req, res) => {
 
   return sendSuccess(res, {
     departments: departments.map((department) => {
-      const leader = department.leaderUserId ? findUserById(department.leaderUserId) : undefined;
+      const leaders = department.leaderUserIds
+        .map((leaderUserId) => findUserById(leaderUserId))
+        .filter((leader) => leader?.status === "active");
 
       return {
         id: department.id,
         name: department.name,
         code: department.code,
         description: department.description,
-        leaderUserId: department.leaderUserId,
-        leader: leader
-          ? {
-              id: leader.id,
-              username: leader.username,
-            displayName: leader.displayName,
-            title: leader.title
-          }
-          : null
+        leaderUserIds: department.leaderUserIds,
+        leaders: leaders.map((leader) => ({
+          id: leader!.id,
+          username: leader!.username,
+          displayName: leader!.displayName,
+          title: leader!.title
+        }))
       };
     })
   });

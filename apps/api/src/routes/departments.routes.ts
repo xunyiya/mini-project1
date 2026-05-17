@@ -49,19 +49,71 @@ departmentsRoutes.patch(
         throw badRequest("负责人必须是该职能下的有效账号");
       }
 
-      const previousLeaderUserId = department.leaderUserId;
-      department.leaderUserId = newLeader.id;
+      const wasLeader = department.leaderUserIds.includes(newLeader.id);
+
+      if (!wasLeader) {
+        department.leaderUserIds.push(newLeader.id);
+      }
 
       writeAuditLog({
         actorUserId: req.currentUser!.id,
         action: "department.leader.update",
         targetType: "Department",
         targetId: department.id,
-        summary: `将 ${department.name} 负责人从 ${previousLeaderUserId ?? "未设置"} 调整为 ${newLeader.id}`,
+        summary: wasLeader
+          ? `${newLeader.id} 已是 ${department.name} 负责人`
+          : `将 ${newLeader.id} 添加为 ${department.name} 负责人`,
         traceId: req.traceId
       });
 
       return sendSuccess(res, toDepartmentWithLeader(department), "负责人已更新");
+    } catch (error) {
+      next(error);
+    }
+  }
+);
+
+departmentsRoutes.delete(
+  "/:departmentId/leader/:userId",
+  authenticate,
+  requirePermission("api.departments.leader.update"),
+  (req, res, next) => {
+    try {
+      const departmentId = String(req.params.departmentId);
+      const userId = String(req.params.userId);
+      const department = getStore().departments.find((item) => item.id === departmentId);
+      const targetLeader = requireUserById(userId);
+
+      if (!department) {
+        throw badRequest("职能不存在");
+      }
+
+      if (targetLeader.departmentId !== department.id) {
+        throw badRequest("只能移除该职能下的负责人");
+      }
+
+      if (!department.leaderUserIds.includes(targetLeader.id)) {
+        throw badRequest("该成员不是当前职能负责人");
+      }
+
+      if (department.leaderUserIds.length <= 1) {
+        throw badRequest("每个职能至少需要保留一名负责人");
+      }
+
+      department.leaderUserIds = department.leaderUserIds.filter(
+        (leaderUserId) => leaderUserId !== targetLeader.id
+      );
+
+      writeAuditLog({
+        actorUserId: req.currentUser!.id,
+        action: "department.leader.remove",
+        targetType: "Department",
+        targetId: department.id,
+        summary: `将 ${targetLeader.id} 从 ${department.name} 负责人中移除`,
+        traceId: req.traceId
+      });
+
+      return sendSuccess(res, toDepartmentWithLeader(department), "负责人已移除");
     } catch (error) {
       next(error);
     }

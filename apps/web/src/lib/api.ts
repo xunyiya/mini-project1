@@ -103,6 +103,11 @@ export const apiClient = {
       body: JSON.stringify(input)
     });
   },
+  removeDepartmentLeader(departmentId: string, userId: string) {
+    return request<DepartmentWithLeader>(`/departments/${departmentId}/leader/${userId}`, {
+      method: "DELETE"
+    });
+  },
   permissionSummary() {
     return request<PermissionSummary>("/permissions/summary");
   }

@@ -12,7 +12,7 @@ export function LoginPage() {
   const [loginOptions, setLoginOptions] = useState<LoginOptions | null>(null);
   const [departmentId, setDepartmentId] = useState("");
   const [loginName, setLoginName] = useState("");
-  const [password, setPassword] = useState("Demo@123456");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +101,12 @@ export function LoginPage() {
           </label>
           {selectedDepartment ? (
             <div className="login-meta">
-              <strong>负责人：{selectedDepartment.leader?.displayName ?? "未设置"}</strong>
+              <strong>
+                负责人：
+                {selectedDepartment.leaders.length > 0
+                  ? selectedDepartment.leaders.map((leader) => leader.displayName).join("、")
+                  : "未设置"}
+              </strong>
               <span>{selectedDepartment.description}</span>
             </div>
           ) : null}

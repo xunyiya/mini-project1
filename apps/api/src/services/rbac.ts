@@ -36,6 +36,7 @@ const buttonActionMap: Record<string, Array<{ code: string; action: string }>> =
   people: [
     { code: "button.people.create", action: "create" },
     { code: "button.people.delete", action: "delete" },
+    { code: "button.people.demoteLeader", action: "demoteLeader" },
     { code: "button.people.promoteLeader", action: "promoteLeader" }
   ],
   admin: [{ code: "button.admin.managePermissions", action: "managePermissions" }]
@@ -101,7 +102,7 @@ export function isAdmin(user: StoredUser) {
 
 export function isDepartmentLeader(user: StoredUser, departmentId = user.departmentId) {
   const department = getStore().departments.find((item) => item.id === departmentId);
-  return department?.leaderUserId === user.id;
+  return department?.leaderUserIds.includes(user.id) ?? false;
 }
 
 export function getManagedDepartmentIds(user: StoredUser) {
@@ -110,7 +111,7 @@ export function getManagedDepartmentIds(user: StoredUser) {
   }
 
   return getStore()
-    .departments.filter((department) => department.leaderUserId === user.id)
+    .departments.filter((department) => department.leaderUserIds.includes(user.id))
     .map((department) => department.id);
 }
 
@@ -181,7 +182,7 @@ export function toSafeUser(user: StoredUser): SafeUser {
       name: role.name,
       code: role.code
     })),
-    isDepartmentLeader: department.leaderUserId === user.id,
+    isDepartmentLeader: department.leaderUserIds.includes(user.id),
     status: user.status,
     title: user.title,
     isSeed: user.isSeed
@@ -189,21 +190,22 @@ export function toSafeUser(user: StoredUser): SafeUser {
 }
 
 export function toDepartmentWithLeader(department: Department): DepartmentWithLeader {
-  const leader = department.leaderUserId ? findUserById(department.leaderUserId) : undefined;
+  const leaders = department.leaderUserIds
+    .map((leaderUserId) => findUserById(leaderUserId))
+    .filter((leader): leader is StoredUser => Boolean(leader))
+    .filter((leader) => leader.status === "active");
   const activeUsers = getStore().users.filter(
     (user) => user.departmentId === department.id && user.status === "active"
   );
 
   return {
     ...department,
-    leader: leader
-      ? {
-          id: leader.id,
-          username: leader.username,
-          displayName: leader.displayName,
-          title: leader.title
-        }
-      : null,
+    leaders: leaders.map((leader) => ({
+      id: leader.id,
+      username: leader.username,
+      displayName: leader.displayName,
+      title: leader.title
+    })),
     memberCount: activeUsers.length
   };
 }

@@ -54,7 +54,7 @@ describe("auth and rbac api", () => {
       (department: { id: string }) => department.id === "dept_platform"
     );
 
-    expect(platform.leader.username).toBe("10002");
+    expect(platform.leaders.map((leader: { username: string }) => leader.username)).toContain("10002");
     expect(platform.users).toBeUndefined();
   });
 
@@ -142,7 +142,7 @@ describe("auth and rbac api", () => {
     );
   });
 
-  it("lets admin promote a department member to leader", async () => {
+  it("lets admin add another department leader", async () => {
     const adminToken = await login("dept_platform", "10001");
 
     const response = await request(app)
@@ -151,7 +151,14 @@ describe("auth and rbac api", () => {
       .send({ userId: "user_product_assistant" })
       .expect(200);
 
-    expect(response.body.data.leader.username).toBe("10002");
+    expect(response.body.data.leaders.map((leader: { username: string }) => leader.username)).toEqual([
+      "10001",
+      "10002"
+    ]);
+    expect(getStore().departments.find((department) => department.id === "dept_product")?.leaderUserIds).toEqual([
+      "user_pm",
+      "user_product_assistant"
+    ]);
 
     const newLeaderToken = await login("dept_product", "10002");
     const meResponse = await request(app)
@@ -160,5 +167,22 @@ describe("auth and rbac api", () => {
       .expect(200);
 
     expect(meResponse.body.data.managedDepartmentIds).toContain("dept_product");
+
+    const removeResponse = await request(app)
+      .delete("/api/v1/departments/dept_product/leader/user_product_assistant")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(200);
+
+    expect(removeResponse.body.data.leaders.map((leader: { username: string }) => leader.username)).toEqual([
+      "10001"
+    ]);
+    expect(getStore().departments.find((department) => department.id === "dept_product")?.leaderUserIds).toEqual([
+      "user_pm"
+    ]);
+
+    await request(app)
+      .delete("/api/v1/departments/dept_product/leader/user_pm")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .expect(400);
   });
 });

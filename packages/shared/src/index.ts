@@ -18,7 +18,7 @@ export type Department = {
   name: string;
   code: string;
   description: string;
-  leaderUserId?: string;
+  leaderUserIds: string[];
   parentId?: string;
   isSeed: true;
 };
@@ -63,7 +63,7 @@ export type SafeUser = Omit<User, "roleIds"> & {
 };
 
 export type DepartmentWithLeader = Department & {
-  leader: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
+  leaders: Array<Pick<SafeUser, "id" | "username" | "displayName" | "title">>;
   memberCount: number;
 };
 
@@ -138,8 +138,8 @@ export type LoginResult = {
 
 export type LoginOptions = {
   departments: Array<
-    Pick<Department, "id" | "name" | "code" | "description" | "leaderUserId"> & {
-      leader: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
+    Pick<Department, "id" | "name" | "code" | "description" | "leaderUserIds"> & {
+      leaders: Array<Pick<SafeUser, "id" | "username" | "displayName" | "title">>;
     }
   >;
 };

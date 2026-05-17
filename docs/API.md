@@ -26,7 +26,8 @@
 | `POST` | `/api/v1/users` | `api.users.create` | 创建职能账号，工号按职能从 10001 自动递增，负责人仅限本职能，admin 不限 |
 | `DELETE` | `/api/v1/users/:userId` | `api.users.delete` | 删除职能账号，负责人仅限本职能，负责人账号需先转移 |
 | `GET` | `/api/v1/departments` | `api.departments.read` | 分页部门列表 |
-| `PATCH` | `/api/v1/departments/:departmentId/leader` | `api.departments.leader.update` | admin 任命某职能负责人 |
+| `PATCH` | `/api/v1/departments/:departmentId/leader` | `api.departments.leader.update` | admin 将某职能成员追加为负责人 |
+| `DELETE` | `/api/v1/departments/:departmentId/leader/:userId` | `api.departments.leader.update` | admin 移除某职能负责人，至少保留一名负责人 |
 | `GET` | `/api/v1/permissions/summary` | `api.permissions.summary.read` | 当前用户权限摘要 |
 
 ## 分页结构

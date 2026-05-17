@@ -1,6 +1,7 @@
 import type { CreateUserInput, DepartmentWithLeader, SafeUser } from "@collab/shared";
-import { Plus, ShieldCheck, Trash2, UserCog } from "lucide-react";
+import { Plus, ShieldCheck, Trash2, UserCog, UserMinus } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ApiClientError, apiClient } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 import { StateBlock } from "../components/StateBlock";
@@ -12,12 +13,22 @@ const defaultForm = {
   password: "Demo@123456"
 };
 
+function restoreScrollPosition(scrollY: number) {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: scrollY, behavior: "auto" });
+    });
+  });
+}
+
 export function PeopleManagementPage() {
-  const { me, refreshMe } = useAuth();
+  const { me } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedDepartmentId = searchParams.get("departmentId");
   const [departments, setDepartments] = useState<DepartmentWithLeader[]>([]);
   const [users, setUsers] = useState<SafeUser[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState(
-    me?.managedDepartmentIds[0] ?? me?.user.departmentId ?? ""
+    requestedDepartmentId ?? me?.managedDepartmentIds[0] ?? me?.user.departmentId ?? ""
   );
   const [form, setForm] = useState(defaultForm);
   const [loading, setLoading] = useState(true);
@@ -35,6 +46,27 @@ export function PeopleManagementPage() {
   );
   const selectedDepartment = visibleDepartments.find(
     (department) => department.id === selectedDepartmentId
+  );
+
+  function replaceDepartment(updatedDepartment: DepartmentWithLeader) {
+    setDepartments((currentDepartments) =>
+      currentDepartments.map((department) =>
+        department.id === updatedDepartment.id ? updatedDepartment : department
+      )
+    );
+  }
+
+  const updateSelectedDepartment = useCallback(
+    (departmentId: string) => {
+      setSelectedDepartmentId(departmentId);
+      if (requestedDepartmentId !== departmentId) {
+        setSearchParams(
+          departmentId ? { departmentId } : {},
+          { replace: true, preventScrollReset: true }
+        );
+      }
+    },
+    [requestedDepartmentId, setSearchParams]
   );
 
   const loadData = useCallback(async (nextDepartmentId = selectedDepartmentId) => {
@@ -62,10 +94,24 @@ export function PeopleManagementPage() {
   }, [loadData, selectedDepartmentId]);
 
   useEffect(() => {
-    if (!selectedDepartmentId && visibleDepartments[0]) {
-      setSelectedDepartmentId(visibleDepartments[0].id);
+    if (requestedDepartmentId && requestedDepartmentId !== selectedDepartmentId) {
+      setSelectedDepartmentId(requestedDepartmentId);
     }
-  }, [selectedDepartmentId, visibleDepartments]);
+  }, [requestedDepartmentId, selectedDepartmentId]);
+
+  useEffect(() => {
+    if (visibleDepartments.length === 0) {
+      return;
+    }
+
+    const selectedIsVisible = visibleDepartments.some(
+      (department) => department.id === selectedDepartmentId
+    );
+
+    if (!selectedDepartmentId || !selectedIsVisible) {
+      updateSelectedDepartment(visibleDepartments[0].id);
+    }
+  }, [selectedDepartmentId, updateSelectedDepartment, visibleDepartments]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -118,16 +164,44 @@ export function PeopleManagementPage() {
   async function handlePromote(user: SafeUser) {
     setSaving(true);
     setError(null);
+    const scrollY = window.scrollY;
+    const departmentToKeep = user.departmentId;
+    updateSelectedDepartment(departmentToKeep);
 
     try {
-      await apiClient.updateDepartmentLeader(user.departmentId, { userId: user.id });
-      await Promise.all([loadData(user.departmentId), refreshMe()]);
+      const updatedDepartment = await apiClient.updateDepartmentLeader(departmentToKeep, {
+        userId: user.id
+      });
+      replaceDepartment(updatedDepartment);
+      updateSelectedDepartment(departmentToKeep);
     } catch (caughtError) {
       const message =
         caughtError instanceof ApiClientError ? caughtError.message : "负责人更新失败";
       setError(message);
     } finally {
       setSaving(false);
+      restoreScrollPosition(scrollY);
+    }
+  }
+
+  async function handleDemote(user: SafeUser) {
+    setSaving(true);
+    setError(null);
+    const scrollY = window.scrollY;
+    const departmentToKeep = user.departmentId;
+    updateSelectedDepartment(departmentToKeep);
+
+    try {
+      const updatedDepartment = await apiClient.removeDepartmentLeader(departmentToKeep, user.id);
+      replaceDepartment(updatedDepartment);
+      updateSelectedDepartment(departmentToKeep);
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof ApiClientError ? caughtError.message : "负责人移除失败";
+      setError(message);
+    } finally {
+      setSaving(false);
+      restoreScrollPosition(scrollY);
     }
   }
 
@@ -150,7 +224,7 @@ export function PeopleManagementPage() {
           <select
             className="department-switch"
             value={selectedDepartmentId}
-            onChange={(event) => setSelectedDepartmentId(event.target.value)}
+            onChange={(event) => updateSelectedDepartment(event.target.value)}
           >
             {visibleDepartments.map((department) => (
               <option key={department.id} value={department.id}>
@@ -162,7 +236,12 @@ export function PeopleManagementPage() {
         {selectedDepartment ? (
           <div className="leader-strip">
             <ShieldCheck size={19} aria-hidden="true" />
-            <strong>负责人：{selectedDepartment.leader?.displayName ?? "未设置"}</strong>
+            <strong>
+              负责人：
+              {selectedDepartment.leaders.length > 0
+                ? selectedDepartment.leaders.map((leader) => leader.displayName).join("、")
+                : "未设置"}
+            </strong>
             <span>{selectedDepartment.memberCount} 个有效账号</span>
           </div>
         ) : null}
@@ -226,9 +305,13 @@ export function PeopleManagementPage() {
         ) : (
           <div className="people-table">
             {users.map((user) => {
-              const isLeader = selectedDepartment?.leaderUserId === user.id;
+              const isLeader = selectedDepartment?.leaderUserIds.includes(user.id) ?? false;
               const canDelete = actions.includes("delete") && !isLeader && user.id !== me?.user.id;
               const canPromote = actions.includes("promoteLeader") && !isLeader;
+              const canDemote =
+                actions.includes("demoteLeader") &&
+                isLeader &&
+                (selectedDepartment?.leaderUserIds.length ?? 0) > 1;
 
               return (
                 <div className="people-row" key={user.id}>
@@ -251,6 +334,17 @@ export function PeopleManagementPage() {
                       >
                         <UserCog size={16} aria-hidden="true" />
                         <span>设为负责人</span>
+                      </button>
+                    ) : null}
+                    {canDemote ? (
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void handleDemote(user)}
+                      >
+                        <UserMinus size={16} aria-hidden="true" />
+                        <span>移除负责人</span>
                       </button>
                     ) : null}
                     {canDelete ? (

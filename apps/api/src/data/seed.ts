@@ -75,6 +75,7 @@ const buttonPermissions = [
   permission("button.people.create", "创建职能账号", "button", "创建本职能账号"),
   permission("button.people.delete", "删除职能账号", "button", "删除本职能账号"),
   permission("button.people.promoteLeader", "设为负责人", "button", "将职能成员设为负责人"),
+  permission("button.people.demoteLeader", "移除负责人", "button", "移除职能成员负责人身份"),
   permission("button.admin.managePermissions", "维护权限", "button", "维护角色和权限配置")
 ];
 
@@ -147,7 +148,7 @@ export function buildDemoData(): DemoData {
       code: "platform",
       name: "平台研发部",
       description: "负责协同工具平台、架构和基础能力建设",
-      leaderUserId: "user_tech_lead",
+      leaderUserIds: ["user_tech_lead"],
       isSeed: true
     },
     {
@@ -155,7 +156,7 @@ export function buildDemoData(): DemoData {
       code: "product",
       name: "产品部",
       description: "负责需求管理、产品方案和验收确认",
-      leaderUserId: "user_pm",
+      leaderUserIds: ["user_pm"],
       isSeed: true
     },
     {
@@ -163,7 +164,7 @@ export function buildDemoData(): DemoData {
       code: "project",
       name: "项目管理部",
       description: "负责项目计划、资源协调和交付风险跟进",
-      leaderUserId: "user_project_manager",
+      leaderUserIds: ["user_project_manager"],
       isSeed: true
     },
     {
@@ -171,7 +172,7 @@ export function buildDemoData(): DemoData {
       code: "quality",
       name: "质量保障部",
       description: "负责测试、缺陷验证和上线质量把关",
-      leaderUserId: "user_qa",
+      leaderUserIds: ["user_qa"],
       isSeed: true
     },
     {
@@ -179,7 +180,7 @@ export function buildDemoData(): DemoData {
       code: "design",
       name: "体验设计部",
       description: "负责交互、视觉和设计交付",
-      leaderUserId: "user_designer",
+      leaderUserIds: ["user_designer"],
       isSeed: true
     },
     {
@@ -187,7 +188,7 @@ export function buildDemoData(): DemoData {
       code: "business",
       name: "运营客服部",
       description: "负责运营需求、用户反馈和上线沟通",
-      leaderUserId: "user_ops_service",
+      leaderUserIds: ["user_ops_service"],
       isSeed: true
     },
     {
@@ -195,7 +196,7 @@ export function buildDemoData(): DemoData {
       code: "review",
       name: "专项评审组",
       description: "负责法务、安全、数据等专项评审",
-      leaderUserId: "user_special_reviewer",
+      leaderUserIds: ["user_special_reviewer"],
       isSeed: true
     },
     {
@@ -203,7 +204,7 @@ export function buildDemoData(): DemoData {
       code: "management",
       name: "管理层",
       description: "查看项目进度、风险和交付效率",
-      leaderUserId: "user_executive",
+      leaderUserIds: ["user_executive"],
       isSeed: true
     }
   ];

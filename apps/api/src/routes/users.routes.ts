@@ -167,7 +167,7 @@ usersRoutes.delete("/:userId", authenticate, requirePermission("api.users.delete
 
     assertCanManageDepartment(req.currentUser!, department.id);
 
-    if (department.leaderUserId === target.id) {
+    if (department.leaderUserIds.includes(target.id)) {
       throw badRequest("不能删除当前负责人，请先任命新的负责人");
     }
 
