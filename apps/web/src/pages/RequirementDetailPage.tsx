@@ -260,7 +260,7 @@ export function RequirementDetailPage() {
               <ArrowLeft size={16} aria-hidden="true" />
               <span>返回列表</span>
             </Link>
-            {requirement.availableActions.includes("edit") ? (
+            {requirement.availableActions.includes("edit") || requirement.availableActions.includes("updateStatus") ? (
               <Link className="ghost-button" to={`/requirements/${requirement.id}/edit`}>
                 <Edit3 size={16} aria-hidden="true" />
                 <span>编辑</span>

@@ -5,6 +5,7 @@ import type { SubmitReviewInput } from "@collab/shared";
 import {
   REQUIREMENT_PRIORITIES,
   REQUIREMENT_SOURCES,
+  REQUIREMENT_STATUSES,
   REQUIREMENT_TYPES,
   REVIEW_NODE_TYPE_LABELS
 } from "@collab/shared";
@@ -58,7 +59,9 @@ const requirementInputSchema = z.object({
   projectMembers: z.array(projectMemberSchema).optional()
 });
 
-const requirementUpdateSchema = requirementInputSchema.partial();
+const requirementUpdateSchema = requirementInputSchema.partial().extend({
+  status: z.enum(REQUIREMENT_STATUSES as [string, ...string[]]).optional()
+});
 const submitReviewSchema = z.object({
   templateId: z.string().trim().optional(),
   approverAssignments: z.record(z.string().trim(), z.string().trim()).optional(),

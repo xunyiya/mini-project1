@@ -341,4 +341,26 @@ describe("requirements api", () => {
     const nodes = getStore().reviewNodes.filter((node) => node.flowId === flow?.id);
     expect(nodes.map((node) => node.nodeType)).toEqual(["TECH", "DESIGN", "OPERATION"]);
   });
+
+  it("lets an authorized owner update requirement status to any target status", async () => {
+    const token = await login("dept_product", "10001");
+
+    const response = await request(app)
+      .patch("/api/v1/requirements/req_seed_0004")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ status: "RELEASED" })
+      .expect(200);
+
+    expect(response.body.data.status).toBe("RELEASED");
+    expect(getStore().requirements.find((item) => item.id === "req_seed_0004")?.status).toBe("RELEASED");
+    expect(getStore().requirementStatusHistories[0]).toMatchObject({
+      entityId: "req_seed_0004",
+      fromStatus: "APPROVED",
+      toStatus: "RELEASED"
+    });
+    expect(getStore().auditLogs[0]).toMatchObject({
+      action: "requirement.status.update",
+      targetId: "req_seed_0004"
+    });
+  });
 });

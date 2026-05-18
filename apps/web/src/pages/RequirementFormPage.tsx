@@ -18,6 +18,8 @@ import {
   REQUIREMENT_PRIORITY_LABELS,
   REQUIREMENT_SOURCE_LABELS,
   REQUIREMENT_SOURCES,
+  REQUIREMENT_STATUS_LABELS,
+  REQUIREMENT_STATUSES,
   REQUIREMENT_TYPE_LABELS,
   REQUIREMENT_TYPES
 } from "@collab/shared";
@@ -40,6 +42,7 @@ type RequirementFormState = {
   source: string;
   type: string;
   priority: string;
+  status: string;
   departmentId: string;
   ownerId: string;
   expectedReleaseDate: string;
@@ -110,6 +113,7 @@ const emptyForm: RequirementFormState = {
   source: "",
   type: "",
   priority: "",
+  status: "DRAFT",
   departmentId: "",
   ownerId: "",
   expectedReleaseDate: "",
@@ -191,6 +195,7 @@ function formFromRequirement(requirement: RequirementView): RequirementFormState
     source: requirement.source ?? "",
     type: requirement.type ?? "",
     priority: requirement.priority ?? "",
+    status: requirement.status,
     departmentId: requirement.departmentId ?? "",
     ownerId: requirement.ownerId ?? "",
     expectedReleaseDate: requirement.expectedReleaseDate ?? "",
@@ -245,13 +250,16 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
     mode === "new" ||
     requirement?.availableActions.includes("submitReview") ||
     requirement?.availableActions.includes("editCoreChange");
-  const canEdit = mode === "new" || requirement?.availableActions.includes("edit");
+  const canEditRequirementFields = mode === "new" || Boolean(requirement?.availableActions.includes("edit"));
+  const canEditStatus = mode === "edit" && Boolean(requirement?.availableActions.includes("updateStatus"));
+  const canEdit = canEditRequirementFields || canEditStatus;
   const postApprovalMode =
     mode === "edit" &&
     Boolean(requirement) &&
     followerOnlyStatuses.includes(requirement!.status as RequirementStatus);
-  const followerOnlyMode = postApprovalMode && canEdit && !requirement?.availableActions.includes("editCoreChange");
-  const canEditBaseFields = canEdit && !postApprovalMode;
+  const followerOnlyMode =
+    postApprovalMode && canEditRequirementFields && !requirement?.availableActions.includes("editCoreChange");
+  const canEditBaseFields = canEditRequirementFields && !postApprovalMode;
   const canEditContentFields =
     canEditBaseFields || Boolean(requirement?.availableActions.includes("editCoreChange"));
   const canEditPeopleFields =
@@ -269,6 +277,18 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
       })),
     [users]
   );
+
+  const statusOptions = useMemo(() => {
+    if (!requirement) {
+      return ["DRAFT"] as RequirementStatus[];
+    }
+
+    if (!canEditStatus) {
+      return [requirement.status as RequirementStatus];
+    }
+
+    return REQUIREMENT_STATUSES;
+  }, [canEditStatus, requirement]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -319,6 +339,7 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
   function buildPayload(): RequirementCreateInput | RequirementUpdateInput {
     if (postApprovalMode) {
       return {
+        ...(canEditStatus ? { status: form.status as RequirementStatus } : {}),
         ...(canEditFollower ? { ownerId: form.ownerId || undefined } : {}),
         ...(canEditPeopleFields
           ? {
@@ -339,6 +360,12 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
       };
     }
 
+    if (!canEditBaseFields) {
+      return {
+        ...(canEditStatus ? { status: form.status as RequirementStatus } : {})
+      };
+    }
+
     return {
       title: form.title,
       description: form.description,
@@ -355,7 +382,8 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
       successMetric: form.successMetric,
       attachments: parseAttachments(form.attachmentsText),
       reviewApproverAssignments: compactAssignments(form.reviewApproverAssignments),
-      projectMembers: compactProjectMembers(form.projectMembers)
+      projectMembers: compactProjectMembers(form.projectMembers),
+      ...(canEditStatus ? { status: form.status as RequirementStatus } : {})
     };
   }
 
@@ -523,6 +551,23 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
               <small>{fieldMessage(fieldErrors, "priority")}</small>
             ) : null}
           </label>
+          {mode === "edit" ? (
+            <label>
+              <span>需求状态</span>
+              <select
+                value={form.status}
+                onChange={(event) => setForm({ ...form, status: event.target.value })}
+                disabled={!canEditStatus}
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {REQUIREMENT_STATUS_LABELS[status]}
+                  </option>
+                ))}
+              </select>
+              {canEditStatus ? <small>可选择任意需求状态</small> : null}
+            </label>
+          ) : null}
           <label>
             <span>提出部门</span>
             <select

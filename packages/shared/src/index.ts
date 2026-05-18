@@ -212,6 +212,7 @@ export type RequirementView = Requirement & {
   availableActions: Array<
     | "view"
     | "edit"
+    | "updateStatus"
     | "editFollower"
     | "editPeople"
     | "editCoreChange"
@@ -469,7 +470,9 @@ export type RequirementCreateInput = {
   projectMembers?: RequirementProjectMember[];
 };
 
-export type RequirementUpdateInput = Partial<RequirementCreateInput>;
+export type RequirementUpdateInput = Partial<RequirementCreateInput> & {
+  status?: RequirementStatus;
+};
 
 export type ProjectCreateInput = {
   requirementId: string;

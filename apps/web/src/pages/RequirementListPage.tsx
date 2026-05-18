@@ -421,7 +421,7 @@ export function RequirementListPage() {
                   <strong>{formatDate(item.expectedReleaseDate)}</strong>
                 </div>
                 <div className="row-actions requirement-list-actions">
-                  {item.availableActions.includes("edit") ? (
+                  {item.availableActions.includes("edit") || item.availableActions.includes("updateStatus") ? (
                     <Link className="ghost-button" to={`/requirements/${item.id}/edit`}>
                       <Edit3 size={16} aria-hidden="true" />
                       <span>编辑</span>

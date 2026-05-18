@@ -54,6 +54,7 @@ const postApprovalStatuses: RequirementStatus[] = [
   "DELIVERED",
   "ARCHIVED"
 ];
+const activeReviewFlowStatuses = new Set(["PENDING", "IN_PROGRESS"]);
 const peopleChangeFields = new Set(["ownerId", "projectMembers", "reviewApproverAssignments"]);
 const relatedPeopleChangeFields = new Set(["projectMembers", "reviewApproverAssignments"]);
 const contentChangeFields = new Set([
@@ -159,6 +160,14 @@ function isEditableStatus(status: RequirementStatus) {
   return editableStatuses.includes(status);
 }
 
+function hasActiveReviewFlow(requirement: Requirement) {
+  return getStore().reviewFlows.some(
+    (flow) =>
+      flow.requirementId === requirement.id &&
+      activeReviewFlowStatuses.has(flow.status)
+  );
+}
+
 export function canEditRequirement(user: StoredUser, requirement: Requirement) {
   if (!isEditableStatus(requirement.status)) {
     return false;
@@ -172,6 +181,18 @@ export function canEditRequirement(user: StoredUser, requirement: Requirement) {
     requirement.submitterId === user.id ||
     requirement.ownerId === user.id ||
     isCoordinator(user)
+  );
+}
+
+export function canUpdateRequirementStatus(user: StoredUser, requirement: Requirement) {
+  if (hasActiveReviewFlow(requirement) || requirement.pendingChangeReview) {
+    return false;
+  }
+
+  return (
+    isCoordinator(user) ||
+    requirement.ownerId === user.id ||
+    (isEditableStatus(requirement.status) && requirement.submitterId === user.id)
   );
 }
 
@@ -274,6 +295,10 @@ export function toRequirementView(requirement: Requirement, currentUser: StoredU
 
   if (canStartRequirementChangeReview(currentUser, requirement)) {
     availableActions.push("edit", "editCoreChange");
+  }
+
+  if (canUpdateRequirementStatus(currentUser, requirement)) {
+    availableActions.push("updateStatus");
   }
 
   if (
@@ -437,6 +462,40 @@ function isAllowedPostApprovalChange(input: RequirementUpdateInput) {
     keys.length > 0 &&
     keys.every((key) => peopleChangeFields.has(key) || contentChangeFields.has(key))
   );
+}
+
+function stripStatus(input: RequirementUpdateInput): RequirementUpdateInput {
+  const { status: _status, ...rest } = input;
+  return rest;
+}
+
+function assertCanTransitionRequirementStatus(
+  requirement: Requirement,
+  targetStatus: RequirementStatus,
+  currentUser: StoredUser
+) {
+  if (!canUpdateRequirementStatus(currentUser, requirement)) {
+    throw forbidden("没有权限变更需求状态");
+  }
+
+  if (targetStatus === requirement.status) {
+    return;
+  }
+}
+
+function applyRequirementStatusUpdate(
+  requirement: Requirement,
+  targetStatus: RequirementStatus | undefined,
+  currentUser: StoredUser
+) {
+  if (!targetStatus || targetStatus === requirement.status) {
+    return false;
+  }
+
+  const fromStatus = requirement.status;
+  requirement.status = targetStatus;
+  appendStatusHistory(requirement, fromStatus, targetStatus, currentUser.id, "手动更新需求状态");
+  return true;
 }
 
 function areAttachmentsEqual(
@@ -717,33 +776,46 @@ export function updateRequirement(
   traceId: string
 ) {
   const requirement = requireRequirement(requirementId);
-  const changedContentFields = getChangedContentFields(requirement, input);
+  const targetStatus = input.status;
+  const fieldInput = stripStatus(input);
+  const hasFieldChanges = Object.keys(fieldInput).length > 0;
+  const hasStatusChange = targetStatus !== undefined && targetStatus !== requirement.status;
+  const changedContentFields = getChangedContentFields(requirement, fieldInput);
+
+  if (targetStatus !== undefined) {
+    assertCanTransitionRequirementStatus(requirement, targetStatus, currentUser);
+  }
+
+  if (hasStatusChange && changedContentFields.length > 0) {
+    throw badRequest("需求内容变更需要走二次评审，不能同时手动变更状态");
+  }
 
   if (!canEditRequirement(currentUser, requirement)) {
     if (
+      hasFieldChanges &&
       postApprovalStatuses.includes(requirement.status) &&
-      isAllowedPostApprovalChange(input)
+      isAllowedPostApprovalChange(fieldInput)
     ) {
       if (changedContentFields.length > 0 && !canStartRequirementChangeReview(currentUser, requirement)) {
         throw forbidden("只有需求相关人或跟进人可以发起二次评审");
       }
 
       if (
-        input.ownerId !== undefined &&
+        fieldInput.ownerId !== undefined &&
         !canChangeRequirementFollower(currentUser, requirement)
       ) {
         throw forbidden("没有权限变更需求跟进人");
       }
 
       if (
-        Object.keys(input).some((key) => relatedPeopleChangeFields.has(key)) &&
+        Object.keys(fieldInput).some((key) => relatedPeopleChangeFields.has(key)) &&
         !canEditRequirementPeople(currentUser, requirement)
       ) {
         throw forbidden("没有权限变更该需求的操作人");
       }
 
-      assertReferenceIds(input);
-      applyRequirementUpdate(requirement, input);
+      assertReferenceIds(fieldInput);
+      applyRequirementUpdate(requirement, fieldInput);
 
       if (changedContentFields.length > 0) {
         const fromStatus = requirement.status;
@@ -765,10 +837,16 @@ export function updateRequirement(
         );
       }
 
+      const statusUpdated = applyRequirementStatusUpdate(requirement, targetStatus, currentUser);
       requirement.updatedAt = new Date().toISOString();
       writeAuditLog({
         actorUserId: currentUser.id,
-        action: changedContentFields.length > 0 ? "requirement.change.update" : "requirement.people.update",
+        action:
+          changedContentFields.length > 0
+            ? "requirement.change.update"
+            : statusUpdated
+              ? "requirement.status.update"
+              : "requirement.people.update",
         targetType: "Requirement",
         targetId: requirement.id,
         summary:
@@ -781,13 +859,29 @@ export function updateRequirement(
       return toRequirementView(requirement, currentUser);
     }
 
-    if (canChangeRequirementFollower(currentUser, requirement) && isFollowerOnlyUpdate(input)) {
-      assertReferenceIds(input);
-      requirement.ownerId = input.ownerId || undefined;
+    if (!hasFieldChanges && targetStatus !== undefined) {
+      applyRequirementStatusUpdate(requirement, targetStatus, currentUser);
       requirement.updatedAt = new Date().toISOString();
       writeAuditLog({
         actorUserId: currentUser.id,
-        action: "requirement.follower.update",
+        action: "requirement.status.update",
+        targetType: "Requirement",
+        targetId: requirement.id,
+        summary: `更新需求状态 ${requirement.code}`,
+        traceId
+      });
+
+      return toRequirementView(requirement, currentUser);
+    }
+
+    if (hasFieldChanges && canChangeRequirementFollower(currentUser, requirement) && isFollowerOnlyUpdate(fieldInput)) {
+      assertReferenceIds(fieldInput);
+      requirement.ownerId = fieldInput.ownerId || undefined;
+      const statusUpdated = applyRequirementStatusUpdate(requirement, targetStatus, currentUser);
+      requirement.updatedAt = new Date().toISOString();
+      writeAuditLog({
+        actorUserId: currentUser.id,
+        action: statusUpdated ? "requirement.status.update" : "requirement.follower.update",
         targetType: "Requirement",
         targetId: requirement.id,
         summary: `变更需求跟进人 ${requirement.code}`,
@@ -800,14 +894,15 @@ export function updateRequirement(
     throw forbidden("当前状态或权限不允许编辑该需求");
   }
 
-  assertReferenceIds(input);
-  applyRequirementUpdate(requirement, input);
+  assertReferenceIds(fieldInput);
+  applyRequirementUpdate(requirement, fieldInput);
+  const statusUpdated = applyRequirementStatusUpdate(requirement, targetStatus, currentUser);
 
   requirement.updatedAt = new Date().toISOString();
 
   writeAuditLog({
     actorUserId: currentUser.id,
-    action: "requirement.update",
+    action: statusUpdated && !hasFieldChanges ? "requirement.status.update" : "requirement.update",
     targetType: "Requirement",
     targetId: requirement.id,
     summary: `编辑需求 ${requirement.code}`,
