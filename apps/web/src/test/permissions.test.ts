@@ -9,6 +9,12 @@ const menus = [
     permissionCode: "menu.dashboard.view"
   },
   {
+    key: "profile",
+    label: "个人信息",
+    path: "/profile",
+    permissionCode: "menu.profile.view"
+  },
+  {
     key: "tasks",
     label: "任务看板",
     path: "/tasks",
@@ -21,6 +27,7 @@ describe("route permission helpers", () => {
     expect(canAccessPath("/", menus)).toBe(true);
     expect(canAccessPath("/tasks", menus)).toBe(true);
     expect(canAccessPath("/tasks/123", menus)).toBe(true);
+    expect(canAccessPath("/profile", menus)).toBe(true);
   });
 
   it("blocks paths that are not in visible menus", () => {
@@ -29,6 +36,7 @@ describe("route permission helpers", () => {
 
   it("recognizes protected application routes", () => {
     expect(isKnownProtectedPath("/requirements")).toBe(true);
+    expect(isKnownProtectedPath("/profile")).toBe(true);
     expect(isKnownProtectedPath("/unknown")).toBe(false);
   });
 });

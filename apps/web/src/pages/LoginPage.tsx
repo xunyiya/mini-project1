@@ -12,7 +12,7 @@ export function LoginPage() {
   const [loginOptions, setLoginOptions] = useState<LoginOptions | null>(null);
   const [departmentId, setDepartmentId] = useState("");
   const [loginName, setLoginName] = useState("");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState("Demo@123456");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -16,11 +16,14 @@ const buttonActionMap: Record<string, Array<{ code: string; action: string }>> =
   requirements: [
     { code: "button.requirements.create", action: "create" },
     { code: "button.requirements.edit", action: "edit" },
-    { code: "button.requirements.submit", action: "submit" }
+    { code: "button.requirements.submit", action: "submit" },
+    { code: "button.requirements.withdraw", action: "withdraw" }
   ],
   reviews: [
     { code: "button.reviews.approve", action: "approve" },
-    { code: "button.reviews.reject", action: "reject" }
+    { code: "button.reviews.reject", action: "reject" },
+    { code: "button.reviews.requestSupplement", action: "requestSupplement" },
+    { code: "button.reviews.transfer", action: "transfer" }
   ],
   projects: [{ code: "button.projects.create", action: "create" }],
   tasks: [

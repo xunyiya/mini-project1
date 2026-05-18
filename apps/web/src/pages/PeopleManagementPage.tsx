@@ -34,15 +34,18 @@ export function PeopleManagementPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const actions = me?.availableActions.people ?? [];
+  const actions = useMemo(() => me?.availableActions.people ?? [], [me?.availableActions.people]);
   const visibleDepartments = useMemo(
     () => {
       const manageableDepartmentIds = new Set(me?.managedDepartmentIds ?? []);
       return departments.filter(
-        (department) => me?.isAdmin || manageableDepartmentIds.has(department.id)
+        (department) =>
+          me?.isAdmin ||
+          manageableDepartmentIds.has(department.id) ||
+          department.id === me?.user.departmentId
       );
     },
-    [departments, me?.isAdmin, me?.managedDepartmentIds]
+    [departments, me?.isAdmin, me?.managedDepartmentIds, me?.user.departmentId]
   );
   const selectedDepartment = visibleDepartments.find(
     (department) => department.id === selectedDepartmentId
@@ -306,7 +309,12 @@ export function PeopleManagementPage() {
           <div className="people-table">
             {users.map((user) => {
               const isLeader = selectedDepartment?.leaderUserIds.includes(user.id) ?? false;
-              const canDelete = actions.includes("delete") && !isLeader && user.id !== me?.user.id;
+              const isAdminUser = user.roles.some((role) => role.code === "admin");
+              const canDelete =
+                actions.includes("delete") &&
+                !isLeader &&
+                user.id !== me?.user.id &&
+                (!isAdminUser || Boolean(me?.isAdmin));
               const canPromote = actions.includes("promoteLeader") && !isLeader;
               const canDemote =
                 actions.includes("demoteLeader") &&

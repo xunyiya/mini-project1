@@ -4,9 +4,19 @@ import { AuthProvider } from "./lib/auth-context";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
+import { MyTasksPage } from "./pages/MyTasksPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { PeopleManagementPage } from "./pages/PeopleManagementPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { ProjectDetailPage } from "./pages/ProjectDetailPage";
+import { ProjectListPage } from "./pages/ProjectListPage";
+import { ProfilePage } from "./pages/ProfilePage";
+import { RequirementDetailPage } from "./pages/RequirementDetailPage";
+import { RequirementFormPage } from "./pages/RequirementFormPage";
+import { RequirementListPage } from "./pages/RequirementListPage";
+import { ReviewsPage } from "./pages/ReviewsPage";
+import { TaskDetailPage } from "./pages/TaskDetailPage";
+import { WorkflowTemplatesPage } from "./pages/WorkflowTemplatesPage";
 import { RequireAuth } from "./routes/RequireAuth";
 
 export function App() {
@@ -18,19 +28,17 @@ export function App() {
           <Route element={<RequireAuth />}>
             <Route element={<MainLayout />}>
               <Route index element={<DashboardPage />} />
-              <Route
-                path="requirements"
-                element={<PlaceholderPage title="需求池" moduleKey="requirements" />}
-              />
-              <Route
-                path="reviews"
-                element={<PlaceholderPage title="评审审批" moduleKey="reviews" />}
-              />
-              <Route
-                path="projects"
-                element={<PlaceholderPage title="项目空间" moduleKey="projects" />}
-              />
-              <Route path="tasks" element={<PlaceholderPage title="任务看板" moduleKey="tasks" />} />
+              <Route path="profile" element={<ProfilePage />} />
+              <Route path="requirements" element={<RequirementListPage />} />
+              <Route path="requirements/new" element={<RequirementFormPage mode="new" />} />
+              <Route path="requirements/:id" element={<RequirementDetailPage />} />
+              <Route path="requirements/:id/edit" element={<RequirementFormPage mode="edit" />} />
+              <Route path="reviews" element={<ReviewsPage />} />
+              <Route path="projects" element={<ProjectListPage />} />
+              <Route path="projects/:id" element={<ProjectDetailPage />} />
+              <Route path="projects/:id/board" element={<ProjectDetailPage />} />
+              <Route path="tasks" element={<MyTasksPage />} />
+              <Route path="tasks/:id" element={<TaskDetailPage />} />
               <Route
                 path="meetings"
                 element={<PlaceholderPage title="会议纪要" moduleKey="meetings" />}
@@ -53,6 +61,7 @@ export function App() {
                 element={<PlaceholderPage title="消息中心" moduleKey="notifications" />}
               />
               <Route path="people" element={<PeopleManagementPage />} />
+              <Route path="admin/workflow-templates" element={<WorkflowTemplatesPage />} />
               <Route path="admin" element={<PlaceholderPage title="权限配置" moduleKey="admin" />} />
               <Route path="403" element={<ForbiddenPage />} />
               <Route path="*" element={<NotFoundPage />} />

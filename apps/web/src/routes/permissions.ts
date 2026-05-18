@@ -2,6 +2,7 @@ import type { MenuItem } from "@collab/shared";
 
 export const knownProtectedPaths = [
   "/",
+  "/profile",
   "/requirements",
   "/reviews",
   "/projects",

@@ -11,8 +11,10 @@ Day 1 已初始化 npm workspaces 全栈骨架：
 - `apps/api`：Express + TypeScript，提供 `/api/v1` 统一响应、JWT 鉴权、RBAC 权限校验、分页接口、审计日志和 demo seed 数据。
 - `apps/web`：React + Vite，提供登录页、主布局、路由守卫、权限菜单过滤、消息入口和基础状态组件。
 - `packages/shared`：共享 API 响应、分页、用户、部门、角色、权限、菜单等类型。
+- 数据默认持久化到 SQLite：`.data/collab.sqlite`。可通过 `DATABASE_URL=sqlite://./.data/collab.sqlite` 指定路径；测试环境默认使用内存 SQLite。
 
 所有 demo 账号密码均为 `Demo@123456`，账号见 [docs/DAY1.md](docs/DAY1.md)。
+如需重置本地 demo 数据库，可运行 `npm run db:seed`。
 
 ---
 

@@ -5,3 +5,7 @@ coverage/
 *.tsbuildinfo
 .env
 .DS_Store
+.data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal

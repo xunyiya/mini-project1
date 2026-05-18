@@ -7,7 +7,13 @@ import { traceMiddleware } from "./middleware/trace";
 import { authRoutes } from "./routes/auth.routes";
 import { departmentsRoutes } from "./routes/departments.routes";
 import { permissionsRoutes } from "./routes/permissions.routes";
+import { projectsRoutes } from "./routes/projects.routes";
+import { reviewNodesRoutes } from "./routes/review-nodes.routes";
+import { reviewsRoutes } from "./routes/reviews.routes";
+import { requirementsRoutes } from "./routes/requirements.routes";
+import { tasksRoutes } from "./routes/tasks.routes";
 import { usersRoutes } from "./routes/users.routes";
+import { workflowTemplatesRoutes } from "./routes/workflow-templates.routes";
 import { sendSuccess } from "./lib/response";
 
 export function createApp() {
@@ -28,6 +34,12 @@ export function createApp() {
   v1.use("/users", usersRoutes);
   v1.use("/departments", departmentsRoutes);
   v1.use("/permissions", permissionsRoutes);
+  v1.use("/requirements", requirementsRoutes);
+  v1.use("/reviews", reviewsRoutes);
+  v1.use("/review-nodes", reviewNodesRoutes);
+  v1.use("/workflow-templates", workflowTemplatesRoutes);
+  v1.use("/projects", projectsRoutes);
+  v1.use("/tasks", tasksRoutes);
 
   app.use(API_PREFIX, v1);
   app.use(notFoundHandler);

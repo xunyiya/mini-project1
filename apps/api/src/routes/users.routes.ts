@@ -3,7 +3,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { getStore, type StoredUser } from "../data/store";
 import { authenticate, requirePermission } from "../middleware/auth";
-import { badRequest, conflict, notFound } from "../lib/errors";
+import { badRequest, conflict, forbidden, notFound } from "../lib/errors";
 import { paginate, parsePagination } from "../lib/pagination";
 import { hashPassword } from "../lib/password";
 import { sendSuccess } from "../lib/response";
@@ -48,6 +48,55 @@ function nextEmployeeNo(departmentId: string) {
     .reduce((max, value) => Math.max(max, value), 10000);
 
   return String(maxEmployeeNo + 1).padStart(5, "0");
+}
+
+function canCreateUserInDepartment(user: StoredUser, departmentId: string) {
+  return isAdmin(user) || user.departmentId === departmentId || canManageDepartment(user, departmentId);
+}
+
+function getUserBusinessReferences(userId: string) {
+  const store = getStore();
+  const references: string[] = [];
+
+  if (
+    store.requirements.some(
+      (requirement) =>
+        requirement.submitterId === userId ||
+        requirement.ownerId === userId ||
+        Object.values(requirement.reviewApproverAssignments ?? {}).includes(userId) ||
+        requirement.projectMembers.some((member) => member.userId === userId)
+    )
+  ) {
+    references.push("需求");
+  }
+
+  if (store.reviewFlows.some((flow) => flow.startedBy === userId)) {
+    references.push("评审流");
+  }
+
+  if (
+    store.reviewNodes.some(
+      (node) => node.approverId === userId || node.transferredToId === userId
+    )
+  ) {
+    references.push("评审节点");
+  }
+
+  if (store.requirementStatusHistories.some((history) => history.operatorId === userId)) {
+    references.push("状态历史");
+  }
+
+  return references;
+}
+
+function removeNotificationsForUser(userId: string) {
+  const notifications = getStore().notifications;
+
+  for (let index = notifications.length - 1; index >= 0; index -= 1) {
+    if (notifications[index].userId === userId) {
+      notifications.splice(index, 1);
+    }
+  }
 }
 
 usersRoutes.get("/", authenticate, requirePermission("api.users.read"), (req, res, next) => {
@@ -103,7 +152,9 @@ usersRoutes.post("/", authenticate, requirePermission("api.users.create"), (req,
       throw badRequest("职能不存在");
     }
 
-    assertCanManageDepartment(req.currentUser!, department.id);
+    if (!canCreateUserInDepartment(req.currentUser!, department.id)) {
+      throw forbidden("只能在自己所属或负责的职能创建账号");
+    }
 
     const normalizedEmail = input.email.trim().toLowerCase();
     const duplicate = store.users.find((user) => user.email.toLowerCase() === normalizedEmail);
@@ -165,13 +216,32 @@ usersRoutes.delete("/:userId", authenticate, requirePermission("api.users.delete
       throw badRequest("账号所属职能不存在");
     }
 
+    const currentUser = req.currentUser!;
+    const targetIsAdmin = getUserRoles(target).some((role) => role.code === "admin");
+
+    if (targetIsAdmin && !isAdmin(currentUser)) {
+      throw forbidden("只有系统管理员可以删除管理员账号");
+    }
+
     assertCanManageDepartment(req.currentUser!, department.id);
 
     if (department.leaderUserIds.includes(target.id)) {
       throw badRequest("不能删除当前负责人，请先任命新的负责人");
     }
 
-    target.status = "disabled";
+    const references = getUserBusinessReferences(target.id);
+
+    if (references.length > 0) {
+      throw badRequest(`该账号已被${references.join("、")}引用，不能直接删除`);
+    }
+
+    const targetIndex = store.users.findIndex((user) => user.id === target.id);
+
+    if (targetIndex >= 0) {
+      store.users.splice(targetIndex, 1);
+    }
+
+    removeNotificationsForUser(target.id);
 
     writeAuditLog({
       actorUserId: req.currentUser!.id,

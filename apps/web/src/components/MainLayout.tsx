@@ -13,6 +13,7 @@ import {
   Network,
   Settings,
   ShieldAlert,
+  UserRound,
   UsersRound
 } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
@@ -20,6 +21,7 @@ import { useAuth } from "../lib/auth-context";
 
 const iconMap = {
   dashboard: LayoutDashboard,
+  profile: UserRound,
   requirements: FileText,
   reviews: ClipboardCheck,
   projects: Boxes,
