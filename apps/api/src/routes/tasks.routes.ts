@@ -10,6 +10,7 @@ import { parsePagination, paginate } from "../lib/pagination";
 import { sendSuccess } from "../lib/response";
 import { authenticate, requirePermission } from "../middleware/auth";
 import {
+  getRequirementTaskBoard,
   getTask,
   listMyTasks,
   setTaskDependencies,
@@ -44,6 +45,19 @@ const taskDependenciesSchema = z.object({
 function routeParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
+
+tasksRoutes.get(
+  "/board",
+  authenticate,
+  requirePermission("api.tasks.read"),
+  (req, res, next) => {
+    try {
+      return sendSuccess(res, getRequirementTaskBoard(req.currentUser!));
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 tasksRoutes.get(
   "/my",

@@ -13,6 +13,7 @@ import type {
   ProjectTaskBoard,
   ProjectUpdateInput,
   ProjectView,
+  RequirementTaskBoard,
   RequirementCreateInput,
   RequirementReviewSummary,
   RequirementStatusHistory,
@@ -230,6 +231,9 @@ export const apiClient = {
       method: "POST",
       body: JSON.stringify(input)
     });
+  },
+  requirementTaskBoard() {
+    return request<RequirementTaskBoard>("/tasks/board");
   },
   myTasks(params: Record<string, string | number | undefined> = {}) {
     const searchParams = new URLSearchParams();

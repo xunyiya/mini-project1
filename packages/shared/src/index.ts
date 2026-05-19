@@ -325,6 +325,34 @@ export type ProjectTaskBoard = {
   board: Record<TaskStatus, TaskView[]>;
 };
 
+export type RequirementTaskBoardColumn = "TODO" | "IN_PROGRESS" | "DELIVERED" | "ARCHIVED";
+
+export type RequirementTaskBoardItem = {
+  id: string;
+  column: RequirementTaskBoardColumn;
+  requirement: Pick<
+    Requirement,
+    | "id"
+    | "code"
+    | "title"
+    | "status"
+    | "priority"
+    | "type"
+    | "ownerId"
+    | "expectedReleaseDate"
+    | "updatedAt"
+  >;
+  project: Pick<Project, "id" | "code" | "name" | "status" | "plannedReleaseDate"> | null;
+  relationLabels: string[];
+  actionText: string;
+  currentNode: Pick<ReviewNode, "id" | "nodeName" | "nodeType" | "status" | "dueAt"> | null;
+};
+
+export type RequirementTaskBoard = {
+  columns: Record<RequirementTaskBoardColumn, RequirementTaskBoardItem[]>;
+  counts: Record<RequirementTaskBoardColumn, number>;
+};
+
 export type ReviewFlowStatus =
   | "PENDING"
   | "IN_PROGRESS"

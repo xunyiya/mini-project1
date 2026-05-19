@@ -8,6 +8,12 @@ import type {
   ProjectUpdateInput,
   ProjectView,
   Requirement,
+  RequirementProjectMemberRole,
+  RequirementStatus,
+  RequirementTaskBoard,
+  RequirementTaskBoardColumn,
+  RequirementTaskBoardItem,
+  ReviewNode,
   Task,
   TaskCreateInput,
   TaskDependenciesInput,
@@ -48,6 +54,33 @@ const taskStatusTransitions: Record<TaskStatus, TaskStatus[]> = {
   BLOCKED: ["IN_PROGRESS", "CANCELED"],
   DONE: [],
   CANCELED: []
+};
+const requirementLifecycleOrder: RequirementStatus[] = [
+  "APPROVED",
+  "SCHEDULED",
+  "PLANNING_DONE",
+  "UI_DESIGNING",
+  "UI_DESIGN_DONE",
+  "IN_DEVELOPMENT",
+  "DEVELOPMENT_DONE",
+  "IN_TESTING",
+  "TESTING_DONE",
+  "ACCEPTANCE",
+  "ACCEPTANCE_DONE",
+  "PENDING_RELEASE",
+  "RELEASED",
+  "DELIVERED",
+  "ARCHIVED"
+];
+const roleStageIndex: Partial<
+  Record<RequirementProjectMemberRole, { start: number; done: number; label: string }>
+> = {
+  PRODUCT: { start: 1, done: 2, label: "产品相关人" },
+  UI_DESIGN: { start: 3, done: 4, label: "UI设计相关人" },
+  FRONTEND: { start: 5, done: 6, label: "前端相关人" },
+  BACKEND: { start: 5, done: 6, label: "后端相关人" },
+  TEST: { start: 7, done: 8, label: "测试相关人" },
+  OTHER: { start: 9, done: 13, label: "项目相关人" }
 };
 
 function hasAnyRole(user: StoredUser, roleCodes: string[]) {
@@ -118,6 +151,32 @@ function summarizeRequirement(requirementId?: string) {
     title: requirement.title,
     status: requirement.status
   };
+}
+
+function getRequirementProject(requirementId: string) {
+  return (
+    getStore()
+      .projects.filter((project) => project.requirementId === requirementId)
+      .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())[0] ?? null
+  );
+}
+
+function getLatestRequirementFlow(requirementId: string) {
+  return (
+    getStore()
+      .reviewFlows.filter((flow) => flow.requirementId === requirementId)
+      .sort((left, right) => new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime())[0] ?? null
+  );
+}
+
+function getFlowNodes(flowId?: string) {
+  if (!flowId) {
+    return [];
+  }
+
+  return getStore()
+    .reviewNodes.filter((node) => node.flowId === flowId)
+    .sort((left, right) => left.orderIndex - right.orderIndex || left.id.localeCompare(right.id));
 }
 
 function requireProject(projectId: string) {
@@ -919,4 +978,256 @@ export function listMyTasks(currentUser: StoredUser) {
     .tasks.filter((task) => task.assigneeId === currentUser.id)
     .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
     .map((task) => toTaskView(task, currentUser));
+}
+
+function requirementLifecycleIndex(status: RequirementStatus) {
+  return requirementLifecycleOrder.indexOf(status);
+}
+
+function isPostApprovalRequirement(requirement: Requirement) {
+  return requirementLifecycleIndex(requirement.status) >= 0;
+}
+
+function getUserReviewNode(nodes: ReviewNode[], currentUser: StoredUser) {
+  const currentNode = nodes.find(
+    (node) => node.approverId === currentUser.id && node.status === "IN_PROGRESS"
+  );
+  const pendingNode = nodes.find(
+    (node) => node.approverId === currentUser.id && node.status === "PENDING"
+  );
+  const handledNode = [...nodes]
+    .reverse()
+    .find(
+      (node) =>
+        node.approverId === currentUser.id &&
+        ["APPROVED", "REJECTED", "NEEDS_SUPPLEMENT", "TRANSFERRED", "SKIPPED"].includes(node.status)
+    );
+
+  return currentNode ?? pendingNode ?? handledNode ?? null;
+}
+
+function getProjectMemberRelation(requirement: Requirement, currentUser: StoredUser) {
+  return requirement.projectMembers.find((member) => member.userId === currentUser.id) ?? null;
+}
+
+function getColumnForProjectMember(
+  requirement: Requirement,
+  role: RequirementProjectMemberRole
+): RequirementTaskBoardColumn | null {
+  if (requirement.status === "ARCHIVED") {
+    return "ARCHIVED";
+  }
+
+  const stage = roleStageIndex[role];
+  const currentIndex = requirementLifecycleIndex(requirement.status);
+
+  if (!stage || currentIndex < 0) {
+    return null;
+  }
+
+  if (currentIndex < stage.start) {
+    return "IN_PROGRESS";
+  }
+
+  if (currentIndex >= stage.done) {
+    return "DELIVERED";
+  }
+
+  return "TODO";
+}
+
+function getColumnForReviewer(node: ReviewNode | null, requirement: Requirement): RequirementTaskBoardColumn | null {
+  if (!node) {
+    return null;
+  }
+
+  if (requirement.status === "ARCHIVED") {
+    return "ARCHIVED";
+  }
+
+  if (node.status === "IN_PROGRESS") {
+    return "TODO";
+  }
+
+  if (node.status === "PENDING") {
+    return "IN_PROGRESS";
+  }
+
+  return "DELIVERED";
+}
+
+function summarizeBoardProject(project: Project | null): RequirementTaskBoardItem["project"] {
+  if (!project) {
+    return null;
+  }
+
+  return {
+    id: project.id,
+    code: project.code,
+    name: project.name,
+    status: project.status,
+    plannedReleaseDate: project.plannedReleaseDate
+  };
+}
+
+function summarizeBoardNode(node: ReviewNode | null): RequirementTaskBoardItem["currentNode"] {
+  if (!node) {
+    return null;
+  }
+
+  return {
+    id: node.id,
+    nodeName: node.nodeName,
+    nodeType: node.nodeType,
+    status: node.status,
+    dueAt: node.dueAt
+  };
+}
+
+function buildRequirementBoardItem(
+  requirement: Requirement,
+  column: RequirementTaskBoardColumn,
+  currentUser: StoredUser,
+  node: ReviewNode | null,
+  relationLabels: string[]
+): RequirementTaskBoardItem {
+  const project = getRequirementProject(requirement.id);
+
+  const actionText =
+    column === "TODO" && node?.status === "IN_PROGRESS"
+      ? `待处理：${node.nodeName}`
+      : column === "TODO" && requirement.ownerId === currentUser.id
+        ? "需求跟进中"
+        : column === "IN_PROGRESS"
+          ? "尚未到你处理"
+          : column === "DELIVERED"
+            ? "你的环节已完成"
+            : "项目已归档";
+
+  return {
+    id: requirement.id,
+    column,
+    requirement: {
+      id: requirement.id,
+      code: requirement.code,
+      title: requirement.title,
+      status: requirement.status,
+      priority: requirement.priority,
+      type: requirement.type,
+      ownerId: requirement.ownerId,
+      expectedReleaseDate: requirement.expectedReleaseDate,
+      updatedAt: requirement.updatedAt
+    },
+    project: summarizeBoardProject(project),
+    relationLabels: Array.from(new Set(relationLabels)),
+    actionText,
+    currentNode: summarizeBoardNode(node)
+  };
+}
+
+function decideRequirementBoardColumn(
+  requirement: Requirement,
+  currentUser: StoredUser
+): { column: RequirementTaskBoardColumn; node: ReviewNode | null; relationLabels: string[] } | null {
+  const flow = getLatestRequirementFlow(requirement.id);
+  const nodes = getFlowNodes(flow?.id);
+  const userNode = getUserReviewNode(nodes, currentUser);
+  const member = getProjectMemberRelation(requirement, currentUser);
+  const isOwner = requirement.ownerId === currentUser.id;
+  const relationLabels: string[] = [];
+
+  if (userNode) {
+    relationLabels.push("审核人");
+  }
+
+  if (member) {
+    relationLabels.push(roleStageIndex[member.role]?.label ?? "项目相关人");
+  }
+
+  if (isOwner && isPostApprovalRequirement(requirement)) {
+    relationLabels.push("需求跟进人");
+  }
+
+  if (relationLabels.length === 0) {
+    return null;
+  }
+
+  if (requirement.status === "ARCHIVED") {
+    return { column: "ARCHIVED", node: userNode, relationLabels };
+  }
+
+  const reviewerColumn = getColumnForReviewer(userNode, requirement);
+  if (reviewerColumn === "TODO") {
+    return { column: reviewerColumn, node: userNode, relationLabels };
+  }
+
+  if (isOwner && isPostApprovalRequirement(requirement)) {
+    if (["DELIVERED", "RELEASED"].includes(requirement.status)) {
+      return { column: "DELIVERED", node: userNode, relationLabels };
+    }
+
+    return { column: "TODO", node: userNode, relationLabels };
+  }
+
+  const memberColumn = member ? getColumnForProjectMember(requirement, member.role) : null;
+  if (memberColumn === "TODO") {
+    return { column: memberColumn, node: userNode, relationLabels };
+  }
+
+  if (reviewerColumn === "IN_PROGRESS" || memberColumn === "IN_PROGRESS") {
+    return { column: "IN_PROGRESS", node: userNode, relationLabels };
+  }
+
+  if (reviewerColumn === "DELIVERED" || memberColumn === "DELIVERED") {
+    return { column: "DELIVERED", node: userNode, relationLabels };
+  }
+
+  return null;
+}
+
+export function getRequirementTaskBoard(currentUser: StoredUser): RequirementTaskBoard {
+  const columns: RequirementTaskBoard["columns"] = {
+    TODO: [],
+    IN_PROGRESS: [],
+    DELIVERED: [],
+    ARCHIVED: []
+  };
+
+  getStore()
+    .requirements.filter((requirement) => requirement.status !== "DRAFT")
+    .forEach((requirement) => {
+      const decision = decideRequirementBoardColumn(requirement, currentUser);
+
+      if (!decision) {
+        return;
+      }
+
+      columns[decision.column].push(
+        buildRequirementBoardItem(
+          requirement,
+          decision.column,
+          currentUser,
+          decision.node,
+          decision.relationLabels
+        )
+      );
+    });
+
+  Object.values(columns).forEach((items) => {
+    items.sort(
+      (left, right) =>
+        new Date(right.requirement.updatedAt).getTime() -
+        new Date(left.requirement.updatedAt).getTime()
+    );
+  });
+
+  return {
+    columns,
+    counts: {
+      TODO: columns.TODO.length,
+      IN_PROGRESS: columns.IN_PROGRESS.length,
+      DELIVERED: columns.DELIVERED.length,
+      ARCHIVED: columns.ARCHIVED.length
+    }
+  };
 }

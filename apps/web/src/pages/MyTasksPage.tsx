@@ -1,14 +1,69 @@
-import type { RequirementPriority, TaskStatus, TaskView } from "@collab/shared";
+import type {
+  RequirementPriority,
+  RequirementStatus,
+  RequirementTaskBoard,
+  RequirementTaskBoardColumn,
+  RequirementTaskBoardItem,
+  RequirementType
+} from "@collab/shared";
 import {
   REQUIREMENT_PRIORITY_LABELS,
-  TASK_STATUS_LABELS,
-  TASK_TYPE_LABELS
+  REQUIREMENT_STATUS_LABELS,
+  REQUIREMENT_TYPE_LABELS,
+  REVIEW_NODE_STATUS_LABELS
 } from "@collab/shared";
-import { CalendarDays, Eye, FolderKanban } from "lucide-react";
+import { Archive, ClipboardList, Clock3, Eye, FolderKanban, PackageCheck } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { StateBlock } from "../components/StateBlock";
 import { ApiClientError, apiClient } from "../lib/api";
+
+const emptyBoard: RequirementTaskBoard = {
+  columns: {
+    TODO: [],
+    IN_PROGRESS: [],
+    DELIVERED: [],
+    ARCHIVED: []
+  },
+  counts: {
+    TODO: 0,
+    IN_PROGRESS: 0,
+    DELIVERED: 0,
+    ARCHIVED: 0
+  }
+};
+
+const boardColumns: Array<{
+  key: RequirementTaskBoardColumn;
+  title: string;
+  description: string;
+  Icon: typeof ClipboardList;
+}> = [
+  {
+    key: "TODO",
+    title: "待办项",
+    description: "待我审核，或需要我跟进的已通过需求",
+    Icon: ClipboardList
+  },
+  {
+    key: "IN_PROGRESS",
+    title: "进行中",
+    description: "与我相关，但还未到我的处理环节",
+    Icon: Clock3
+  },
+  {
+    key: "DELIVERED",
+    title: "已交付",
+    description: "与我相关，且我的环节已经完成",
+    Icon: PackageCheck
+  },
+  {
+    key: "ARCHIVED",
+    title: "已归档",
+    description: "与我相关，且项目已经归档",
+    Icon: Archive
+  }
+];
 
 function formatDate(value?: string) {
   if (!value) {
@@ -20,33 +75,87 @@ function formatDate(value?: string) {
   );
 }
 
+function BoardCard({ item }: { item: RequirementTaskBoardItem }) {
+  return (
+    <article className="requirement-task-card">
+      <div className="task-card-title">
+        <Link to={`/requirements/${item.requirement.id}`}>{item.requirement.title}</Link>
+      </div>
+      <span className="muted-text">
+        {item.requirement.code} · 更新 {formatDate(item.requirement.updatedAt)}
+      </span>
+      <div className="task-board-badges">
+        <span className={`status-pill requirement-status status-${item.requirement.status.toLowerCase()}`}>
+          {REQUIREMENT_STATUS_LABELS[item.requirement.status as RequirementStatus]}
+        </span>
+        {item.requirement.priority ? (
+          <span className={`priority-pill priority-${item.requirement.priority.toLowerCase()}`}>
+            {REQUIREMENT_PRIORITY_LABELS[item.requirement.priority as RequirementPriority]}
+          </span>
+        ) : null}
+        {item.requirement.type ? (
+          <span className="type-pill">
+            {REQUIREMENT_TYPE_LABELS[item.requirement.type as RequirementType]}
+          </span>
+        ) : null}
+      </div>
+      <div className="task-board-meta">
+        <strong>{item.actionText}</strong>
+        {item.currentNode ? (
+          <span>
+            {item.currentNode.nodeName} · {REVIEW_NODE_STATUS_LABELS[item.currentNode.status]} · 到期{" "}
+            {formatDate(item.currentNode.dueAt)}
+          </span>
+        ) : (
+          <span>期望上线 {formatDate(item.requirement.expectedReleaseDate)}</span>
+        )}
+      </div>
+      <div className="filter-chip-group compact-chip-group">
+        {item.relationLabels.map((label) => (
+          <span className="filter-chip readonly" key={label}>
+            {label}
+          </span>
+        ))}
+      </div>
+      <div className="row-actions task-card-actions">
+        <Link className="ghost-button" to={`/requirements/${item.requirement.id}`}>
+          <Eye size={16} aria-hidden="true" />
+          <span>需求</span>
+        </Link>
+        {item.project ? (
+          <Link className="ghost-button" to={`/projects/${item.project.id}`}>
+            <FolderKanban size={16} aria-hidden="true" />
+            <span>项目</span>
+          </Link>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
 export function MyTasksPage() {
-  const [items, setItems] = useState<TaskView[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [board, setBoard] = useState<RequirementTaskBoard>(emptyBoard);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadTasks = useCallback(async () => {
+  const loadBoard = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const pageData = await apiClient.myTasks({ page, pageSize: 10 });
-      setItems(pageData.items);
-      setTotalPages(pageData.totalPages);
-      setTotal(pageData.total);
+      setBoard(await apiClient.requirementTaskBoard());
     } catch (caughtError) {
-      setError(caughtError instanceof ApiClientError ? caughtError.message : "我的任务加载失败");
+      setError(caughtError instanceof ApiClientError ? caughtError.message : "任务看板加载失败");
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, []);
 
   useEffect(() => {
-    void loadTasks();
-  }, [loadTasks]);
+    void loadBoard();
+  }, [loadBoard]);
+
+  const total = Object.values(board.counts).reduce((sum, count) => sum + count, 0);
 
   return (
     <div className="page-content tasks-page">
@@ -54,76 +163,39 @@ export function MyTasksPage() {
         <div className="section-heading">
           <div>
             <span className="eyebrow">任务看板</span>
-            <h2>我的任务</h2>
+            <h2>我的需求协同事项</h2>
           </div>
-          <span>共 {total} 个任务</span>
+          <span>共 {total} 项</span>
         </div>
         {error ? <div className="form-error">{error}</div> : null}
-        {loading && items.length === 0 ? (
-          <StateBlock type="loading" title="正在加载我的任务" />
-        ) : items.length === 0 ? (
-          <StateBlock type="empty" title="暂无分配给你的任务" />
+      </section>
+
+      <section className="content-band">
+        {loading ? (
+          <StateBlock type="loading" title="正在加载任务看板" />
+        ) : total === 0 ? (
+          <StateBlock type="empty" title="暂无与你相关的需求协同事项" />
         ) : (
-          <div className="task-list">
-            {items.map((task) => (
-              <article className={`task-list-row${task.overdue ? " overdue" : ""}`} key={task.id}>
-                <div>
-                  <Link className="requirement-title" to={`/tasks/${task.id}`}>
-                    {task.title}
-                  </Link>
-                  <span className="muted-text">
-                    {task.code} · {task.project?.name ?? "-"} · {TASK_TYPE_LABELS[task.taskType]}
-                  </span>
+          <div className="requirement-task-board">
+            {boardColumns.map(({ key, title, description, Icon }) => (
+              <section className="requirement-task-column" key={key}>
+                <div className="requirement-task-column-title">
+                  <div>
+                    <Icon size={18} aria-hidden="true" />
+                    <strong>{title}</strong>
+                  </div>
+                  <span>{board.counts[key]}</span>
                 </div>
-                <span className={`status-pill task-status status-${task.status.toLowerCase()}`}>
-                  {TASK_STATUS_LABELS[task.status as TaskStatus]}
-                </span>
-                <span className={`priority-pill priority-${task.priority.toLowerCase()}`}>
-                  {REQUIREMENT_PRIORITY_LABELS[task.priority as RequirementPriority]}
-                </span>
-                <span className="task-date">
-                  <CalendarDays size={14} aria-hidden="true" />
-                  {formatDate(task.dueDate)}
-                </span>
-                <div className="row-actions">
-                  {task.project ? (
-                    <Link className="ghost-button" to={`/projects/${task.project.id}`}>
-                      <FolderKanban size={16} aria-hidden="true" />
-                      <span>项目</span>
-                    </Link>
-                  ) : null}
-                  <Link className="ghost-button" to={`/tasks/${task.id}`}>
-                    <Eye size={16} aria-hidden="true" />
-                    <span>详情</span>
-                  </Link>
-                </div>
-              </article>
+                <p>{description}</p>
+                {board.columns[key].length === 0 ? (
+                  <div className="task-empty">暂无事项</div>
+                ) : (
+                  board.columns[key].map((item) => <BoardCard item={item} key={item.id} />)
+                )}
+              </section>
             ))}
           </div>
         )}
-        {totalPages > 1 ? (
-          <div className="pagination-bar">
-            <button
-              className="ghost-button"
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((currentPage) => currentPage - 1)}
-            >
-              上一页
-            </button>
-            <span>
-              第 {page} / {totalPages} 页
-            </span>
-            <button
-              className="ghost-button"
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((currentPage) => currentPage + 1)}
-            >
-              下一页
-            </button>
-          </div>
-        ) : null}
       </section>
     </div>
   );

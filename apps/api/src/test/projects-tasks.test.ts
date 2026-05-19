@@ -182,4 +182,55 @@ describe("projects and tasks api", () => {
       status: "TODO"
     });
   });
+
+  it("returns requirement-linked task board todos for current reviewers and approved followers", async () => {
+    const productToken = await login("dept_product", "10002");
+
+    const response = await request(app)
+      .get("/api/v1/tasks/board")
+      .set("Authorization", `Bearer ${productToken}`)
+      .expect(200);
+
+    const todoTitles = response.body.data.columns.TODO.map(
+      (item: { requirement: { title: string } }) => item.requirement.title
+    );
+
+    expect(todoTitles).toEqual(expect.arrayContaining(["项目风险红黄灯规则", "活动报名页性能优化"]));
+  });
+
+  it("places project members by whether their requirement stage is waiting, current, delivered, or archived", async () => {
+    const developerToken = await login("dept_platform", "10003");
+    const store = getStore();
+    const waitingRequirement = store.requirements.find((item) => item.id === "req_seed_0004")!;
+    const deliveredRequirement = store.requirements.find((item) => item.id === "req_seed_0006")!;
+    const archivedRequirement = store.requirements.find((item) => item.id === "req_seed_0008")!;
+
+    waitingRequirement.status = "SCHEDULED";
+    waitingRequirement.projectMembers = [{ role: "FRONTEND", userId: "user_developer" }];
+    deliveredRequirement.status = "DEVELOPMENT_DONE";
+    deliveredRequirement.projectMembers = [{ role: "FRONTEND", userId: "user_developer" }];
+    archivedRequirement.status = "ARCHIVED";
+    archivedRequirement.projectMembers = [{ role: "FRONTEND", userId: "user_developer" }];
+
+    const response = await request(app)
+      .get("/api/v1/tasks/board")
+      .set("Authorization", `Bearer ${developerToken}`)
+      .expect(200);
+
+    expect(
+      response.body.data.columns.IN_PROGRESS.some(
+        (item: { requirement: { id: string } }) => item.requirement.id === waitingRequirement.id
+      )
+    ).toBe(true);
+    expect(
+      response.body.data.columns.DELIVERED.some(
+        (item: { requirement: { id: string } }) => item.requirement.id === deliveredRequirement.id
+      )
+    ).toBe(true);
+    expect(
+      response.body.data.columns.ARCHIVED.some(
+        (item: { requirement: { id: string } }) => item.requirement.id === archivedRequirement.id
+      )
+    ).toBe(true);
+  });
 });
