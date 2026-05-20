@@ -1001,6 +1001,13 @@ textarea {
   gap: 10px;
 }
 
+.people-picker-field {
+  display: grid;
+  gap: 7px;
+  color: #49545b;
+  font-size: 14px;
+}
+
 .field-toolbar {
   min-height: 34px;
   display: flex;
@@ -1019,10 +1026,63 @@ textarea {
   min-height: 30px;
 }
 
-.department-check-grid {
+.department-dropdown {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
+}
+
+.department-dropdown-trigger {
+  min-height: 42px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #cfd8dc;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #182027;
+  cursor: pointer;
+  padding: 0 12px;
+  text-align: left;
+}
+
+.department-dropdown-trigger span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.department-dropdown-trigger svg {
+  flex: 0 0 auto;
+  color: #59686f;
+  transition: transform 0.16s ease;
+}
+
+.department-dropdown.open .department-dropdown-trigger {
+  border-bottom-right-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.department-dropdown.open .department-dropdown-trigger svg {
+  transform: rotate(180deg);
+}
+
+.department-dropdown-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.66;
+}
+
+.department-check-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid #cfd8dc;
+  border-top: 0;
+  border-bottom-right-radius: 6px;
+  border-bottom-left-radius: 6px;
+  background: #ffffff;
 }
 
 .department-check {
@@ -1038,11 +1098,28 @@ textarea {
   cursor: pointer;
 }
 
+.department-check-list .department-check {
+  border: 0;
+  border-radius: 0;
+  border-bottom: 1px solid #e8eef0;
+}
+
+.department-check-list .department-check:last-child {
+  border-bottom: 0;
+}
+
 .department-check input {
   width: 16px;
   min-height: 16px;
   flex: 0 0 auto;
   padding: 0;
+}
+
+.department-check span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .department-check.selected {

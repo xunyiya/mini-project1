@@ -23,7 +23,7 @@ import {
   REQUIREMENT_TYPE_LABELS,
   REQUIREMENT_TYPES
 } from "@collab/shared";
-import { ArrowLeft, Save, Send } from "lucide-react";
+import { ArrowLeft, ChevronDown, Save, Send } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { StateBlock } from "../components/StateBlock";
@@ -245,6 +245,9 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
   const [saving, setSaving] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [relatedDepartmentsOpen, setRelatedDepartmentsOpen] = useState(false);
+  const [openProjectMemberRole, setOpenProjectMemberRole] =
+    useState<RequirementProjectMemberRole | null>(null);
 
   const canSubmit =
     mode === "new" ||
@@ -289,6 +292,44 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
 
     return REQUIREMENT_STATUSES;
   }, [canEditStatus, requirement]);
+
+  const relatedDepartmentSummary = useMemo(() => {
+    const selectedDepartments = departments
+      .filter((department) => form.relatedDepartments.includes(department.id))
+      .map((department) => department.name);
+
+    if (selectedDepartments.length === 0) {
+      return "请选择相关部门";
+    }
+
+    if (selectedDepartments.length <= 3) {
+      return selectedDepartments.join("、");
+    }
+
+    return `${selectedDepartments.slice(0, 3).join("、")} 等 ${selectedDepartments.length} 个部门`;
+  }, [departments, form.relatedDepartments]);
+
+  const projectMemberSummaries = useMemo(
+    () =>
+      Object.fromEntries(
+        projectMemberRoles.map((role) => {
+          const selectedMembers = ownerOptions
+            .filter((owner) => form.projectMembers[role].includes(owner.id))
+            .map((owner) => owner.label);
+
+          if (selectedMembers.length === 0) {
+            return [role, "请选择项目相关人"];
+          }
+
+          if (selectedMembers.length <= 2) {
+            return [role, selectedMembers.join("、")];
+          }
+
+          return [role, `${selectedMembers.slice(0, 2).join("、")} 等 ${selectedMembers.length} 人`];
+        })
+      ) as Record<RequirementProjectMemberRole, string>,
+    [form.projectMembers, ownerOptions]
+  );
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -360,6 +401,32 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
       ...currentForm,
       relatedDepartments: []
     }));
+  }
+
+  function handleProjectMemberToggle(
+    role: RequirementProjectMemberRole,
+    userId: string,
+    checked: boolean
+  ) {
+    setForm((currentForm) => {
+      const selectedMembers = new Set(currentForm.projectMembers[role]);
+
+      if (checked) {
+        selectedMembers.add(userId);
+      } else {
+        selectedMembers.delete(userId);
+      }
+
+      return {
+        ...currentForm,
+        projectMembers: {
+          ...currentForm.projectMembers,
+          [role]: ownerOptions
+            .map((owner) => owner.id)
+            .filter((id) => selectedMembers.has(id))
+        }
+      };
+    });
   }
 
   function buildPayload(): RequirementCreateInput | RequirementUpdateInput {
@@ -665,27 +732,50 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
                 </button>
               </div>
             </div>
-            <div className="department-check-grid">
-              {departments.map((department) => {
-                const checked = form.relatedDepartments.includes(department.id);
+            <div className={`department-dropdown${relatedDepartmentsOpen ? " open" : ""}`}>
+              <button
+                className="department-dropdown-trigger"
+                type="button"
+                disabled={!canEditBaseFields || departments.length === 0}
+                aria-expanded={relatedDepartmentsOpen}
+                aria-controls="related-departments-panel"
+                onClick={() => {
+                  setOpenProjectMemberRole(null);
+                  setRelatedDepartmentsOpen((open) => !open);
+                }}
+              >
+                <span>{relatedDepartmentSummary}</span>
+                <ChevronDown size={16} aria-hidden="true" />
+              </button>
+              {relatedDepartmentsOpen ? (
+                <div
+                  className="department-check-list"
+                  id="related-departments-panel"
+                  role="group"
+                  aria-label="相关部门"
+                >
+                  {departments.map((department) => {
+                    const checked = form.relatedDepartments.includes(department.id);
 
-                return (
-                  <label
-                    key={department.id}
-                    className={`department-check${checked ? " selected" : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={!canEditBaseFields}
-                      onChange={(event) =>
-                        handleRelatedDepartmentToggle(department.id, event.target.checked)
-                      }
-                    />
-                    <span>{department.name}</span>
-                  </label>
-                );
-              })}
+                    return (
+                      <label
+                        key={department.id}
+                        className={`department-check${checked ? " selected" : ""}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={!canEditBaseFields}
+                          onChange={(event) =>
+                            handleRelatedDepartmentToggle(department.id, event.target.checked)
+                          }
+                        />
+                        <span>{department.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
             {fieldMessage(fieldErrors, "relatedDepartments") ? (
               <small>{fieldMessage(fieldErrors, "relatedDepartments")}</small>
@@ -735,31 +825,62 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
               <span>可选，用于后续项目和任务流转</span>
             </div>
             <div className="form-grid two-columns">
-              {projectMemberRoles.map((role) => (
-                <label key={role}>
-                  <span>{REQUIREMENT_PROJECT_MEMBER_ROLE_LABELS[role]}</span>
-                  <select
-                    multiple
-                    value={form.projectMembers[role]}
-                    onChange={(event) =>
-                      setForm({
-                        ...form,
-                        projectMembers: {
-                          ...form.projectMembers,
-                          [role]: Array.from(event.target.selectedOptions).map((option) => option.value)
-                        }
-                      })
-                    }
-                    disabled={!canEditPeopleFields}
-                  >
-                    {ownerOptions.map((owner) => (
-                      <option key={owner.id} value={owner.id}>
-                        {owner.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+              {projectMemberRoles.map((role) => {
+                const isOpen = openProjectMemberRole === role;
+
+                return (
+                  <div className="people-picker-field" key={role}>
+                    <span>{REQUIREMENT_PROJECT_MEMBER_ROLE_LABELS[role]}</span>
+                    <div className={`department-dropdown${isOpen ? " open" : ""}`}>
+                      <button
+                        className="department-dropdown-trigger"
+                        type="button"
+                        disabled={!canEditPeopleFields || ownerOptions.length === 0}
+                        aria-expanded={isOpen}
+                        aria-controls={`project-members-${role}`}
+                        onClick={() => {
+                          setRelatedDepartmentsOpen(false);
+                          setOpenProjectMemberRole((currentRole) =>
+                            currentRole === role ? null : role
+                          );
+                        }}
+                      >
+                        <span>{projectMemberSummaries[role]}</span>
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </button>
+                      {isOpen ? (
+                        <div
+                          className="department-check-list"
+                          id={`project-members-${role}`}
+                          role="group"
+                          aria-label={REQUIREMENT_PROJECT_MEMBER_ROLE_LABELS[role]}
+                        >
+                          {ownerOptions.map((owner) => {
+                            const checked = form.projectMembers[role].includes(owner.id);
+
+                            return (
+                              <label
+                                key={owner.id}
+                                className={`department-check${checked ? " selected" : ""}`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={!canEditPeopleFields}
+                                  onChange={(event) =>
+                                    handleProjectMemberToggle(role, owner.id, event.target.checked)
+                                  }
+                                />
+                                <span>{owner.label}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
           <label className="wide-field">
