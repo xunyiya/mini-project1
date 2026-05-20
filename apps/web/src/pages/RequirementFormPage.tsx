@@ -329,11 +329,37 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
     void loadData();
   }, [loadData]);
 
-  function handleRelatedDepartmentsChange(selectedOptions: HTMLCollectionOf<HTMLOptionElement>) {
-    setForm({
-      ...form,
-      relatedDepartments: Array.from(selectedOptions).map((option) => option.value)
+  function handleRelatedDepartmentToggle(departmentId: string, checked: boolean) {
+    setForm((currentForm) => {
+      const selectedDepartments = new Set(currentForm.relatedDepartments);
+
+      if (checked) {
+        selectedDepartments.add(departmentId);
+      } else {
+        selectedDepartments.delete(departmentId);
+      }
+
+      return {
+        ...currentForm,
+        relatedDepartments: departments
+          .map((department) => department.id)
+          .filter((id) => selectedDepartments.has(id))
+      };
     });
+  }
+
+  function handleSelectAllRelatedDepartments() {
+    setForm((currentForm) => ({
+      ...currentForm,
+      relatedDepartments: departments.map((department) => department.id)
+    }));
+  }
+
+  function handleClearRelatedDepartments() {
+    setForm((currentForm) => ({
+      ...currentForm,
+      relatedDepartments: []
+    }));
   }
 
   function buildPayload(): RequirementCreateInput | RequirementUpdateInput {
@@ -616,24 +642,55 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
               <small>{fieldMessage(fieldErrors, "expectedReleaseDate")}</small>
             ) : null}
           </label>
-          <label className="wide-field">
-            <span>相关部门</span>
-            <select
-              multiple
-              value={form.relatedDepartments}
-              onChange={(event) => handleRelatedDepartmentsChange(event.target.selectedOptions)}
-              disabled={!canEditBaseFields}
-            >
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
+          <div className="wide-field department-picker-field">
+            <div className="field-toolbar">
+              <span>相关部门</span>
+              <div className="row-actions">
+                <span>{form.relatedDepartments.length} / {departments.length}</span>
+                <button
+                  className="ghost-button compact-button"
+                  type="button"
+                  disabled={!canEditBaseFields || departments.length === 0}
+                  onClick={handleSelectAllRelatedDepartments}
+                >
+                  全选
+                </button>
+                <button
+                  className="ghost-button compact-button"
+                  type="button"
+                  disabled={!canEditBaseFields || form.relatedDepartments.length === 0}
+                  onClick={handleClearRelatedDepartments}
+                >
+                  清空
+                </button>
+              </div>
+            </div>
+            <div className="department-check-grid">
+              {departments.map((department) => {
+                const checked = form.relatedDepartments.includes(department.id);
+
+                return (
+                  <label
+                    key={department.id}
+                    className={`department-check${checked ? " selected" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={!canEditBaseFields}
+                      onChange={(event) =>
+                        handleRelatedDepartmentToggle(department.id, event.target.checked)
+                      }
+                    />
+                    <span>{department.name}</span>
+                  </label>
+                );
+              })}
+            </div>
             {fieldMessage(fieldErrors, "relatedDepartments") ? (
               <small>{fieldMessage(fieldErrors, "relatedDepartments")}</small>
             ) : null}
-          </label>
+          </div>
           <div className="wide-field form-subsection">
             <div className="section-heading compact-heading">
               <h3>审批人</h3>

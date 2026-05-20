@@ -986,13 +986,73 @@ textarea {
   grid-column: 1 / -1;
 }
 
-.requirement-form label small {
+.requirement-form label small,
+.department-picker-field small {
   color: #a43c2f;
 }
 
 .requirement-form select[multiple] {
   min-height: 138px;
   padding: 8px 10px;
+}
+
+.department-picker-field {
+  display: grid;
+  gap: 10px;
+}
+
+.field-toolbar {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #49545b;
+  font-size: 14px;
+}
+
+.field-toolbar > span {
+  font-weight: 600;
+}
+
+.compact-button {
+  min-height: 30px;
+}
+
+.department-check-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.department-check {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid #d5e0e4;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #24333b;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.department-check input {
+  width: 16px;
+  min-height: 16px;
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.department-check.selected {
+  border-color: #77abc4;
+  background: #eef7fb;
+}
+
+.department-check:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.66;
 }
 
 .form-subsection {
