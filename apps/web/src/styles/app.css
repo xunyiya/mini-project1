@@ -1720,7 +1720,7 @@ textarea {
 
 .bug-filters {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(140px, 1fr)) auto;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(5, minmax(136px, 1fr)) auto;
   gap: 12px;
   align-items: end;
 }
@@ -1794,7 +1794,7 @@ textarea {
   align-content: center;
 }
 
-.bug-ticket-main strong,
+.bug-ticket-main a,
 .bug-ticket-relation a,
 .bug-ticket-relation span,
 .bug-ticket-people span,
@@ -1805,7 +1805,7 @@ textarea {
   white-space: nowrap;
 }
 
-.bug-ticket-main strong,
+.bug-ticket-main a,
 .bug-ticket-relation a {
   color: #173746;
   font-weight: 800;

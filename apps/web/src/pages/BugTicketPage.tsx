@@ -1,12 +1,4 @@
-import type {
-  BugStatus,
-  BugTicketCreateInput,
-  BugTicketUpdateInput,
-  BugTicketView,
-  ProjectView,
-  RequirementView,
-  SafeUser
-} from "@collab/shared";
+import type { BugTicketCreateInput, BugTicketView, ProjectView, RequirementView, SafeUser } from "@collab/shared";
 import {
   BUG_SEVERITIES,
   BUG_SEVERITY_LABELS,
@@ -15,53 +7,36 @@ import {
   REQUIREMENT_PRIORITIES,
   REQUIREMENT_PRIORITY_LABELS
 } from "@collab/shared";
-import { Pencil, Plus, Save, Search, X } from "lucide-react";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Pencil, Plus, Search } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  BugTicketForm,
+  buildBugPayload,
+  defaultBugForm,
+  type BugFormState,
+  userLabel
+} from "../components/BugTicketForm";
 import { StateBlock } from "../components/StateBlock";
 import { ApiClientError, apiClient } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
 
 type Filters = {
   search: string;
-  status: string;
-  severity: string;
-  priority: string;
-  handlerId: string;
-};
-
-type BugFormState = {
-  title: string;
-  severity: string;
-  priority: string;
-  status: string;
-  requirementId: string;
   projectId: string;
-  finderId: string;
+  status: string;
+  severity: string;
+  priority: string;
   handlerId: string;
-  relatedUserIds: string[];
-  description: string;
 };
 
 const defaultFilters: Filters = {
   search: "",
+  projectId: "",
   status: "",
   severity: "",
   priority: "",
   handlerId: ""
-};
-
-const defaultForm: BugFormState = {
-  title: "",
-  severity: "S3",
-  priority: "P2",
-  status: "CREATED",
-  requirementId: "",
-  projectId: "",
-  finderId: "",
-  handlerId: "",
-  relatedUserIds: [],
-  description: ""
 };
 
 function formatDateTime(value?: string) {
@@ -77,25 +52,6 @@ function formatDateTime(value?: string) {
   }).format(new Date(value));
 }
 
-function userLabel(user: Pick<SafeUser, "username" | "displayName" | "title">) {
-  return `${user.displayName}（${user.username} · ${user.title}）`;
-}
-
-function formFromBugTicket(bugTicket: BugTicketView): BugFormState {
-  return {
-    title: bugTicket.title,
-    severity: bugTicket.severity,
-    priority: bugTicket.priority,
-    status: bugTicket.status,
-    requirementId: bugTicket.requirementId,
-    projectId: bugTicket.projectId,
-    finderId: bugTicket.finderId,
-    handlerId: bugTicket.handlerId,
-    relatedUserIds: bugTicket.relatedUserIds,
-    description: bugTicket.description
-  };
-}
-
 export function BugTicketPage() {
   const { me } = useAuth();
   const [filters, setFilters] = useState(defaultFilters);
@@ -105,11 +61,10 @@ export function BugTicketPage() {
   const [requirements, setRequirements] = useState<RequirementView[]>([]);
   const [projects, setProjects] = useState<ProjectView[]>([]);
   const [form, setForm] = useState<BugFormState>({
-    ...defaultForm,
+    ...defaultBugForm,
     finderId: me?.user.id ?? ""
   });
   const [showForm, setShowForm] = useState(false);
-  const [editingBugId, setEditingBugId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
@@ -118,13 +73,6 @@ export function BugTicketPage() {
   const [error, setError] = useState<string | null>(null);
 
   const canCreate = me?.availableActions.defects?.includes("create") ?? false;
-  const projectOptions = useMemo(
-    () =>
-      form.requirementId
-        ? projects.filter((project) => project.requirementId === form.requirementId)
-        : projects,
-    [form.requirementId, projects]
-  );
 
   const loadReferences = useCallback(async () => {
     const [userPage, requirementPage, projectPage] = await Promise.all([
@@ -170,10 +118,9 @@ export function BugTicketPage() {
 
   function resetForm() {
     setForm({
-      ...defaultForm,
+      ...defaultBugForm,
       finderId: me?.user.id ?? ""
     });
-    setEditingBugId(null);
     setShowForm(false);
   }
 
@@ -183,55 +130,13 @@ export function BugTicketPage() {
     setAppliedFilters(filters);
   }
 
-  function handleRequirementChange(requirementId: string) {
-    const currentProject = projects.find((project) => project.id === form.projectId);
-
-    setForm({
-      ...form,
-      requirementId,
-      projectId: currentProject?.requirementId === requirementId ? form.projectId : ""
-    });
-  }
-
-  function toggleRelatedUser(userId: string) {
-    const current = new Set(form.relatedUserIds);
-
-    if (current.has(userId)) {
-      current.delete(userId);
-    } else {
-      current.add(userId);
-    }
-
-    setForm({ ...form, relatedUserIds: Array.from(current) });
-  }
-
-  function buildPayload(): BugTicketCreateInput | BugTicketUpdateInput {
-    return {
-      title: form.title,
-      severity: form.severity as BugTicketCreateInput["severity"],
-      priority: form.priority as BugTicketCreateInput["priority"],
-      status: form.status as BugStatus,
-      requirementId: form.requirementId,
-      projectId: form.projectId,
-      finderId: form.finderId,
-      handlerId: form.handlerId,
-      relatedUserIds: form.relatedUserIds,
-      description: form.description
-    };
-  }
-
-  async function handleSaveBugTicket(event: FormEvent<HTMLFormElement>) {
+  async function handleCreateBugTicket(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
 
     try {
-      if (editingBugId) {
-        await apiClient.updateBugTicket(editingBugId, buildPayload());
-      } else {
-        await apiClient.createBugTicket(buildPayload() as BugTicketCreateInput);
-      }
-
+      await apiClient.createBugTicket(buildBugPayload(form) as BugTicketCreateInput);
       resetForm();
       await Promise.all([loadBugTickets(), loadReferences()]);
     } catch (caughtError) {
@@ -243,16 +148,9 @@ export function BugTicketPage() {
 
   function startCreate() {
     setForm({
-      ...defaultForm,
+      ...defaultBugForm,
       finderId: me?.user.id ?? ""
     });
-    setEditingBugId(null);
-    setShowForm(true);
-  }
-
-  function startEdit(bugTicket: BugTicketView) {
-    setForm(formFromBugTicket(bugTicket));
-    setEditingBugId(bugTicket.id);
     setShowForm(true);
   }
 
@@ -274,157 +172,17 @@ export function BugTicketPage() {
         {error ? <div className="form-error">{error}</div> : null}
 
         {showForm ? (
-          <form className="bug-ticket-form" onSubmit={handleSaveBugTicket}>
-            <div className="form-grid two-columns">
-              <label className="wide-field">
-                <span>标题</span>
-                <input
-                  value={form.title}
-                  onChange={(event) => setForm({ ...form, title: event.target.value })}
-                  required
-                />
-              </label>
-              <label>
-                <span>严重等级</span>
-                <select
-                  value={form.severity}
-                  onChange={(event) => setForm({ ...form, severity: event.target.value })}
-                  required
-                >
-                  {BUG_SEVERITIES.map((severity) => (
-                    <option key={severity} value={severity}>
-                      {BUG_SEVERITY_LABELS[severity]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>优先级</span>
-                <select
-                  value={form.priority}
-                  onChange={(event) => setForm({ ...form, priority: event.target.value })}
-                  required
-                >
-                  {REQUIREMENT_PRIORITIES.map((priority) => (
-                    <option key={priority} value={priority}>
-                      {REQUIREMENT_PRIORITY_LABELS[priority]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>状态</span>
-                <select
-                  value={form.status}
-                  onChange={(event) => setForm({ ...form, status: event.target.value })}
-                  required
-                >
-                  {BUG_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {BUG_STATUS_LABELS[status]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>关联需求</span>
-                <select
-                  value={form.requirementId}
-                  onChange={(event) => handleRequirementChange(event.target.value)}
-                  required
-                >
-                  <option value="">请选择</option>
-                  {requirements.map((requirement) => (
-                    <option key={requirement.id} value={requirement.id}>
-                      {requirement.code} · {requirement.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>对应项目</span>
-                <select
-                  value={form.projectId}
-                  onChange={(event) => setForm({ ...form, projectId: event.target.value })}
-                  required
-                >
-                  <option value="">请选择</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.code} · {project.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>发现人</span>
-                <select
-                  value={form.finderId}
-                  onChange={(event) => setForm({ ...form, finderId: event.target.value })}
-                  required
-                >
-                  <option value="">请选择</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {userLabel(user)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>处理人</span>
-                <select
-                  value={form.handlerId}
-                  onChange={(event) => setForm({ ...form, handlerId: event.target.value })}
-                  required
-                >
-                  <option value="">请选择</option>
-                  {users.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {userLabel(user)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="wide-field related-user-picker">
-                <span>bug关联人</span>
-                <div className="filter-chip-group">
-                  {users.map((user) => {
-                    const selected = form.relatedUserIds.includes(user.id);
-
-                    return (
-                      <button
-                        className={`filter-chip${selected ? " active" : ""}`}
-                        key={user.id}
-                        type="button"
-                        onClick={() => toggleRelatedUser(user.id)}
-                      >
-                        {user.displayName}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <label className="wide-field">
-                <span>bug描述</span>
-                <textarea
-                  rows={4}
-                  value={form.description}
-                  onChange={(event) => setForm({ ...form, description: event.target.value })}
-                />
-              </label>
-            </div>
-            <div className="form-actions">
-              <button className="ghost-button" type="button" onClick={resetForm}>
-                <X size={16} aria-hidden="true" />
-                <span>取消</span>
-              </button>
-              <button className="primary-button" type="submit" disabled={saving}>
-                <Save size={18} aria-hidden="true" />
-                <span>{saving ? "保存中" : editingBugId ? "保存修改" : "创建bug单"}</span>
-              </button>
-            </div>
-          </form>
+          <BugTicketForm
+            form={form}
+            users={users}
+            requirements={requirements}
+            projects={projects}
+            saving={saving}
+            submitLabel="创建bug单"
+            onCancel={resetForm}
+            onChange={setForm}
+            onSubmit={handleCreateBugTicket}
+          />
         ) : null}
       </section>
 
@@ -437,6 +195,20 @@ export function BugTicketPage() {
               onChange={(event) => setFilters({ ...filters, search: event.target.value })}
               placeholder="编号、标题、描述"
             />
+          </label>
+          <label>
+            <span>项目</span>
+            <select
+              value={filters.projectId}
+              onChange={(event) => setFilters({ ...filters, projectId: event.target.value })}
+            >
+              <option value="">全部项目</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} · {project.name}
+                </option>
+              ))}
+            </select>
           </label>
           <label>
             <span>状态</span>
@@ -524,7 +296,7 @@ export function BugTicketPage() {
             {items.map((bugTicket) => (
               <article className="bug-ticket-row" key={bugTicket.id}>
                 <div className="bug-ticket-main">
-                  <strong>{bugTicket.title}</strong>
+                  <Link to={`/defects/${bugTicket.id}`}>{bugTicket.title}</Link>
                   <span>{bugTicket.code}</span>
                 </div>
                 <div className="requirement-table-cell">
@@ -572,10 +344,10 @@ export function BugTicketPage() {
                 </div>
                 <div className="row-actions bug-ticket-actions">
                   {bugTicket.availableActions.includes("edit") ? (
-                    <button className="ghost-button" type="button" onClick={() => startEdit(bugTicket)}>
+                    <Link className="ghost-button" to={`/defects/${bugTicket.id}/edit`}>
                       <Pencil size={16} aria-hidden="true" />
                       <span>编辑</span>
-                    </button>
+                    </Link>
                   ) : (
                     <span className="muted-text">只读</span>
                   )}

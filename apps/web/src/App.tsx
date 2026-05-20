@@ -1,6 +1,8 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { MainLayout } from "./components/MainLayout";
 import { AuthProvider } from "./lib/auth-context";
+import { BugTicketDetailPage } from "./pages/BugTicketDetailPage";
+import { BugTicketFormPage } from "./pages/BugTicketFormPage";
 import { BugTicketPage } from "./pages/BugTicketPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
@@ -50,6 +52,8 @@ export function App() {
                 element={<PlaceholderPage title="变更申请" moduleKey="changes" />}
               />
               <Route path="defects" element={<BugTicketPage />} />
+              <Route path="defects/:id" element={<BugTicketDetailPage />} />
+              <Route path="defects/:id/edit" element={<BugTicketFormPage />} />
               <Route
                 path="releases"
                 element={<PlaceholderPage title="上线计划" moduleKey="releases" />}
