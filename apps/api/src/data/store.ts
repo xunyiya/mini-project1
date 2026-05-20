@@ -82,12 +82,14 @@ function normalizeStore(input: Partial<InMemoryStore>): InMemoryStore {
     notifications: input.notifications ?? fallback.notifications
   };
 
-  normalized.requirements = normalized.requirements.map((requirement) => ({
-    ...requirement,
-    reviewApproverAssignments: requirement.reviewApproverAssignments ?? {},
-    projectMembers: requirement.projectMembers ?? [],
-    pendingChangeReview: requirement.pendingChangeReview
-  }));
+  normalized.requirements = normalizeRequirementCodes(
+    normalized.requirements.map((requirement) => ({
+      ...requirement,
+      reviewApproverAssignments: requirement.reviewApproverAssignments ?? {},
+      projectMembers: requirement.projectMembers ?? [],
+      pendingChangeReview: requirement.pendingChangeReview
+    }))
+  );
   normalized.roles = normalized.roles.map((role) => {
     const fallbackRole = fallback.roles.find((item) => item.id === role.id);
     const nextPermissionCodes = new Set(role.permissionCodes);
@@ -105,6 +107,22 @@ function normalizeStore(input: Partial<InMemoryStore>): InMemoryStore {
   });
 
   return normalized;
+}
+
+function normalizeRequirementCodes(requirements: Requirement[]) {
+  const normalizedRequirements = requirements.map((requirement) => ({ ...requirement }));
+  const sortedRequirements = [...normalizedRequirements].sort((left, right) => {
+    const timeDiff =
+      new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+
+    return timeDiff || left.id.localeCompare(right.id);
+  });
+
+  sortedRequirements.forEach((requirement, index) => {
+    requirement.code = `X${index + 1}`;
+  });
+
+  return normalizedRequirements;
 }
 
 function loadStore() {

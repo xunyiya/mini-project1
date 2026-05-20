@@ -643,16 +643,13 @@ function assertReferenceIds(input: RequirementCreateInput | RequirementUpdateInp
 }
 
 function generateRequirementCode() {
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replaceAll("-", "");
-  const prefix = `REQ-${datePart}-`;
   const maxSerial = getStore()
-    .requirements.filter((requirement) => requirement.code.startsWith(prefix))
-    .map((requirement) => Number(requirement.code.slice(prefix.length)))
+    .requirements.map((requirement) => /^X(\d+)$/.exec(requirement.code)?.[1])
+    .map((serial) => Number(serial))
     .filter((value) => Number.isFinite(value))
     .reduce((max, value) => Math.max(max, value), 0);
 
-  return `${prefix}${String(maxSerial + 1).padStart(4, "0")}`;
+  return `X${maxSerial + 1}`;
 }
 
 export function createRequirement(

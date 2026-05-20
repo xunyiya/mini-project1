@@ -349,13 +349,17 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
         setRequirement(detail);
         setForm(formFromRequirement(detail));
       } else {
-        setForm((currentForm) => ({
-          ...currentForm,
+        setRequirement(null);
+        setForm({
+          ...emptyForm,
+          projectMembers: emptyProjectMemberMap(),
+          departmentId: me?.user.departmentId ?? "",
+          ownerId: me?.user.id ?? "",
           reviewApproverAssignments: defaultReviewAssignments(
             departmentPage.items,
             me?.user.id
           )
-        }));
+        });
       }
     } catch (caughtError) {
       const message =
@@ -364,7 +368,7 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [id, me?.user.id, mode]);
+  }, [id, me?.user.departmentId, me?.user.id, mode]);
 
   useEffect(() => {
     void loadData();

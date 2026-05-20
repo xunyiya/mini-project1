@@ -63,7 +63,7 @@ describe("requirements api", () => {
       status: "DRAFT",
       submitterId: "user_pm"
     });
-    expect(response.body.data.code).toMatch(/^REQ-\d{8}-\d{4}$/);
+    expect(response.body.data.code).toMatch(/^X\d+$/);
     expect(getStore().requirementStatusHistories[0]).toMatchObject({
       entityId: response.body.data.id,
       toStatus: "DRAFT"

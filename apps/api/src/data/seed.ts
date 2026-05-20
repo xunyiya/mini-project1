@@ -222,7 +222,7 @@ function seedRequirement(
   return {
     ...input,
     id: `req_seed_${serial}`,
-    code: `REQ-20260517-${serial}`,
+    code: `X${index}`,
     reviewApproverAssignments: input.reviewApproverAssignments ?? {},
     projectMembers: input.projectMembers ?? [],
     createdAt,
