@@ -52,7 +52,8 @@ tasksRoutes.get(
   requirePermission("api.tasks.read"),
   (req, res, next) => {
     try {
-      return sendSuccess(res, getRequirementTaskBoard(req.currentUser!));
+      const projectId = String(req.query.projectId ?? "").trim() || undefined;
+      return sendSuccess(res, getRequirementTaskBoard(req.currentUser!, projectId));
     } catch (error) {
       next(error);
     }

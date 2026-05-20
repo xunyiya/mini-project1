@@ -13,6 +13,7 @@ import type {
   PageData,
   PermissionSummary,
   ProjectCreateInput,
+  ProjectOption,
   ProjectTaskBoard,
   ProjectUpdateInput,
   ProjectView,
@@ -201,6 +202,9 @@ export const apiClient = {
     const query = searchParams.toString();
     return request<PageData<ProjectView>>(`/projects${query ? `?${query}` : ""}`);
   },
+  projectOptions() {
+    return request<ProjectOption[]>("/projects/options");
+  },
   createProject(input: ProjectCreateInput) {
     return request<ProjectView>("/projects", {
       method: "POST",
@@ -235,8 +239,17 @@ export const apiClient = {
       body: JSON.stringify(input)
     });
   },
-  requirementTaskBoard() {
-    return request<RequirementTaskBoard>("/tasks/board");
+  requirementTaskBoard(params: Record<string, string | number | undefined> = {}) {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    const query = searchParams.toString();
+    return request<RequirementTaskBoard>(`/tasks/board${query ? `?${query}` : ""}`);
   },
   myTasks(params: Record<string, string | number | undefined> = {}) {
     const searchParams = new URLSearchParams();

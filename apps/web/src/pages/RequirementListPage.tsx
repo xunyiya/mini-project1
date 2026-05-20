@@ -1,5 +1,6 @@
 import type {
   DepartmentWithLeader,
+  ProjectOption,
   RequirementPriority,
   RequirementStatus,
   RequirementType,
@@ -22,6 +23,7 @@ import { ApiClientError, apiClient } from "../lib/api";
 
 type Filters = {
   search: string;
+  projectId: string;
   status: string;
   priority: string;
   type: string;
@@ -35,6 +37,7 @@ type Filters = {
 
 const defaultFilters: Filters = {
   search: "",
+  projectId: "",
   status: "",
   priority: "",
   type: "",
@@ -79,6 +82,7 @@ export function RequirementListPage() {
   const [items, setItems] = useState<RequirementView[]>([]);
   const [departments, setDepartments] = useState<DepartmentWithLeader[]>([]);
   const [users, setUsers] = useState<SafeUser[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -88,12 +92,14 @@ export function RequirementListPage() {
   const viewingDrafts = appliedFilters.status === "DRAFT";
 
   const loadReferences = useCallback(async () => {
-    const [departmentPage, userPage] = await Promise.all([
+    const [departmentPage, userPage, projectOptions] = await Promise.all([
       apiClient.departments(1, 100),
-      apiClient.users(1, 100)
+      apiClient.users(1, 100),
+      apiClient.projectOptions()
     ]);
     setDepartments(departmentPage.items);
     setUsers(userPage.items);
+    setProjects(projectOptions);
   }, []);
 
   const loadRequirements = useCallback(async () => {
@@ -135,7 +141,9 @@ export function RequirementListPage() {
   }
 
   function handleToggleDrafts() {
-    const nextFilters = viewingDrafts ? defaultFilters : { ...defaultFilters, status: "DRAFT" };
+    const nextFilters = viewingDrafts
+      ? { ...defaultFilters, projectId: appliedFilters.projectId }
+      : { ...defaultFilters, projectId: appliedFilters.projectId, status: "DRAFT" };
     setPage(1);
     setFilters(nextFilters);
     setAppliedFilters(nextFilters);
@@ -203,7 +211,10 @@ export function RequirementListPage() {
               <FileText size={16} aria-hidden="true" />
               <span>{viewingDrafts ? "返回需求列表" : "查看草稿"}</span>
             </button>
-            <Link className="primary-button inline-action" to="/requirements/new">
+            <Link
+              className="primary-button inline-action"
+              to={appliedFilters.projectId ? `/requirements/new?projectId=${appliedFilters.projectId}` : "/requirements/new"}
+            >
               <Plus size={18} aria-hidden="true" />
               <span>新建需求</span>
             </Link>
@@ -211,6 +222,20 @@ export function RequirementListPage() {
         </div>
 
         <form className="requirement-filters" onSubmit={handleFilterSubmit}>
+          <label>
+            <span>所属项目</span>
+            <select
+              value={filters.projectId}
+              onChange={(event) => setFilters({ ...filters, projectId: event.target.value })}
+            >
+              <option value="">全部项目</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} · {project.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="filter-search">
             <span>关键词</span>
             <input
@@ -387,6 +412,7 @@ export function RequirementListPage() {
                   </Link>
                   <span className="muted-text">
                     {item.code} · {item.submitter.displayName} 提交 · 创建 {formatDate(item.createdAt)}
+                    {item.project ? ` · ${item.project.code} ${item.project.name}` : ""}
                   </span>
                 </div>
                 <div className="requirement-table-cell requirement-status-cell">

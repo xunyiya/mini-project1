@@ -92,6 +92,7 @@ export type RequirementListQuery = {
   status?: string;
   priority?: string;
   type?: string;
+  projectId?: string;
   departmentId?: string;
   ownerId?: string;
   dateFrom?: string;
@@ -144,6 +145,25 @@ function summarizeDepartment(departmentId?: string) {
     id: department.id,
     name: department.name,
     code: department.code
+  };
+}
+
+function summarizeProject(projectId?: string) {
+  if (!projectId) {
+    return null;
+  }
+
+  const project = getStore().projects.find((item) => item.id === projectId);
+
+  if (!project) {
+    return null;
+  }
+
+  return {
+    id: project.id,
+    code: project.code,
+    name: project.name,
+    status: project.status
   };
 }
 
@@ -323,6 +343,7 @@ export function toRequirementView(requirement: Requirement, currentUser: StoredU
     submitter: summarizeUser(requirement.submitterId)!,
     owner: summarizeUser(requirement.ownerId),
     department: summarizeDepartment(requirement.departmentId),
+    project: summarizeProject(requirement.projectId),
     relatedDepartmentInfos: requirement.relatedDepartments
       .map((departmentId) => summarizeDepartment(departmentId))
       .filter((department): department is Pick<Department, "id" | "name" | "code"> =>
@@ -338,6 +359,7 @@ export function listRequirements(query: RequirementListQuery, currentUser: Store
   const statusFilter = parseListFilter(query.status);
   const priorityFilter = parseListFilter(query.priority);
   const typeFilter = parseListFilter(query.type);
+  const projectId = String(query.projectId ?? "").trim();
   const departmentId = String(query.departmentId ?? "").trim();
   const ownerId = String(query.ownerId ?? "").trim();
   const dateFrom = query.dateFrom ? new Date(query.dateFrom) : null;
@@ -379,6 +401,7 @@ export function listRequirements(query: RequirementListQuery, currentUser: Store
     .filter(
       (requirement) => typeFilter.size === 0 || (requirement.type && typeFilter.has(requirement.type))
     )
+    .filter((requirement) => !projectId || requirement.projectId === projectId)
     .filter((requirement) => !departmentId || requirement.departmentId === departmentId)
     .filter((requirement) => !ownerId || requirement.ownerId === ownerId)
     .filter((requirement) => {
@@ -583,6 +606,10 @@ function inferChangeReviewNodeTypes(requirement: Requirement) {
 function assertReferenceIds(input: RequirementCreateInput | RequirementUpdateInput) {
   const store = getStore();
 
+  if (input.projectId && !store.projects.some((item) => item.id === input.projectId)) {
+    throw badRequest("所属项目不存在");
+  }
+
   if (input.departmentId && !store.departments.some((item) => item.id === input.departmentId)) {
     throw badRequest("提出部门不存在");
   }
@@ -671,6 +698,7 @@ export function createRequirement(
     type: input.type,
     priority: input.priority,
     status: "DRAFT",
+    projectId: input.projectId || undefined,
     departmentId: input.departmentId,
     ownerId: input.ownerId,
     submitterId: currentUser.id,
@@ -727,6 +755,10 @@ function applyRequirementUpdate(requirement: Requirement, input: RequirementUpda
 
   if (input.priority !== undefined) {
     requirement.priority = input.priority;
+  }
+
+  if (input.projectId !== undefined) {
+    requirement.projectId = input.projectId || undefined;
   }
 
   if (input.departmentId !== undefined) {

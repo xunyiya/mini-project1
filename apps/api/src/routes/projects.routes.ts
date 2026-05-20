@@ -14,6 +14,7 @@ import {
   createTask,
   getProject,
   listProjectTasks,
+  listProjectOptions,
   listProjects,
   startProject,
   updateProject
@@ -62,6 +63,18 @@ function normalizeListQuery(query: Record<string, unknown>) {
     dateTo: String(query.dateTo ?? query.createdTo ?? rangeEnd ?? "").trim()
   };
 }
+
+projectsRoutes.get(
+  "/options",
+  authenticate,
+  (req, res, next) => {
+    try {
+      return sendSuccess(res, listProjectOptions());
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 projectsRoutes.get(
   "/",

@@ -73,6 +73,13 @@ describe("projects and tasks api", () => {
       status: "PLANNING",
       requirementId: "req_seed_0004"
     });
+    expect(createResponse.body.data.code).toMatch(/^P\d+$/);
+    expect(createResponse.body.data).toMatchObject({
+      requirementCount: expect.any(Number),
+      memberCount: expect.any(Number),
+      health: expect.stringMatching(/GREEN|YELLOW|RED/),
+      riskSummary: expect.any(String)
+    });
 
     await request(app)
       .post("/api/v1/projects")
@@ -87,16 +94,45 @@ describe("projects and tasks api", () => {
   it("moves requirement to scheduled after project creation", async () => {
     const projectManagerToken = await login("dept_project", "10001");
 
-    await createProject(projectManagerToken);
+    const project = await createProject(projectManagerToken);
 
     expect(getStore().requirements.find((item) => item.id === "req_seed_0004")?.status).toBe(
       "SCHEDULED"
+    );
+    expect(getStore().requirements.find((item) => item.id === "req_seed_0004")?.projectId).toBe(
+      project.id
     );
     expect(
       getStore().requirementStatusHistories.some(
         (history) => history.entityId === "req_seed_0004" && history.toStatus === "SCHEDULED"
       )
     ).toBe(true);
+  });
+
+  it("allows project selector options but limits project space to admins and department leaders", async () => {
+    const developerToken = await login("dept_platform", "10003");
+    const platformLeaderToken = await login("dept_platform", "10002");
+
+    const optionsResponse = await request(app)
+      .get("/api/v1/projects/options")
+      .set("Authorization", `Bearer ${developerToken}`)
+      .expect(200);
+
+    expect(optionsResponse.body.data[0]).toMatchObject({
+      id: expect.any(String),
+      code: expect.stringMatching(/^P\d+$/),
+      name: expect.any(String)
+    });
+
+    await request(app)
+      .get("/api/v1/projects")
+      .set("Authorization", `Bearer ${developerToken}`)
+      .expect(403);
+
+    await request(app)
+      .get("/api/v1/projects")
+      .set("Authorization", `Bearer ${platformLeaderToken}`)
+      .expect(200);
   });
 
   it("creates tasks under a project", async () => {

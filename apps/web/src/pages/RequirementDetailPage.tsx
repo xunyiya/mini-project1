@@ -396,6 +396,16 @@ export function RequirementDetailPage() {
             label="相关部门"
             value={requirement.relatedDepartmentInfos.map((department) => department.name).join("、")}
           />
+          <div className="detail-field">
+            <span>所属项目</span>
+            {requirement.project ? (
+              <Link className="text-link" to={`/projects/${requirement.project.id}`}>
+                {requirement.project.code} · {requirement.project.name}
+              </Link>
+            ) : (
+              <strong>-</strong>
+            )}
+          </div>
           <FieldItem label="项目相关人" value={projectMemberSummary()} />
           <FieldItem label="更新时间" value={formatDateTime(requirement.updatedAt)} />
         </div>

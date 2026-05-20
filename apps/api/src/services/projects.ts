@@ -3,6 +3,8 @@ import type {
   Department,
   Project,
   ProjectCreateInput,
+  ProjectHealth,
+  ProjectOption,
   ProjectStatus,
   ProjectTaskBoard,
   ProjectUpdateInput,
@@ -28,7 +30,7 @@ import { getStore, type StoredUser } from "../data/store";
 import { badRequest, forbidden, notFound } from "../lib/errors";
 import { writeAuditLog } from "./audit";
 import { createNotification, createNotifications } from "./notifications";
-import { getUserRoles, isAdmin, toSafeUser } from "./rbac";
+import { getManagedDepartmentIds, getUserRoles, isAdmin, isDepartmentLeader, toSafeUser } from "./rbac";
 import { appendStatusHistory, requireRequirement } from "./requirements";
 
 export type ProjectListQuery = {
@@ -90,6 +92,16 @@ function hasAnyRole(user: StoredUser, roleCodes: string[]) {
 
 function isProjectCoordinator(user: StoredUser) {
   return isAdmin(user) || hasAnyRole(user, ["product_manager", "project_manager"]);
+}
+
+function canEnterProjectSpace(user: StoredUser) {
+  return isAdmin(user) || isDepartmentLeader(user);
+}
+
+function assertCanEnterProjectSpace(user: StoredUser) {
+  if (!canEnterProjectSpace(user)) {
+    throw forbidden("只有系统管理员和职能负责人可以进入项目空间");
+  }
 }
 
 function normalizeString(value: unknown) {
@@ -154,6 +166,15 @@ function summarizeRequirement(requirementId?: string) {
 }
 
 function getRequirementProject(requirementId: string) {
+  const requirement = getStore().requirements.find((item) => item.id === requirementId);
+  const linkedProject = requirement?.projectId
+    ? getStore().projects.find((project) => project.id === requirement.projectId)
+    : null;
+
+  if (linkedProject) {
+    return linkedProject;
+  }
+
   return (
     getStore()
       .projects.filter((project) => project.requirementId === requirementId)
@@ -220,11 +241,17 @@ function assertDepartments(departmentIds: string[]) {
 }
 
 function canCreateProject(user: StoredUser, requirement: Requirement) {
-  return requirement.ownerId === user.id || isProjectCoordinator(user);
+  return requirement.ownerId === user.id || isProjectCoordinator(user) || canEnterProjectSpace(user);
 }
 
 function canManageProject(user: StoredUser, project: Project) {
-  return project.ownerId === user.id || isProjectCoordinator(user);
+  const managedDepartmentIds = getManagedDepartmentIds(user);
+
+  return (
+    project.ownerId === user.id ||
+    isProjectCoordinator(user) ||
+    managedDepartmentIds.some((departmentId) => project.participantDepartmentIds.includes(departmentId))
+  );
 }
 
 function isProjectParticipant(user: StoredUser, project: Project) {
@@ -317,8 +344,157 @@ function getProjectTaskStats(projectId: string) {
   };
 }
 
+function getProjectRequirements(project: Project) {
+  const seen = new Set<string>();
+  return getStore()
+    .requirements.filter(
+      (requirement) => requirement.projectId === project.id || requirement.id === project.requirementId
+    )
+    .filter((requirement) => {
+      if (seen.has(requirement.id)) {
+        return false;
+      }
+
+      seen.add(requirement.id);
+      return true;
+    })
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+}
+
+function summarizeProjectRequirements(project: Project) {
+  return getProjectRequirements(project).map((requirement) => ({
+    id: requirement.id,
+    code: requirement.code,
+    title: requirement.title,
+    status: requirement.status,
+    priority: requirement.priority,
+    updatedAt: requirement.updatedAt
+  }));
+}
+
+function getProjectMemberCount(project: Project, requirements: Requirement[]) {
+  const memberIds = new Set<string>([project.ownerId, project.createdBy]);
+
+  requirements.forEach((requirement) => {
+    if (requirement.ownerId) {
+      memberIds.add(requirement.ownerId);
+    }
+
+    requirement.projectMembers.forEach((member) => memberIds.add(member.userId));
+  });
+
+  return Array.from(memberIds).filter(Boolean).length;
+}
+
+function getLastActiveAt(project: Project, tasks: Task[], requirements: Requirement[]) {
+  const timestamps = [
+    project.updatedAt,
+    ...tasks.map((task) => task.updatedAt),
+    ...requirements.map((requirement) => requirement.updatedAt)
+  ]
+    .map((value) => new Date(value).getTime())
+    .filter((value) => Number.isFinite(value));
+
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
+function getProjectChangeCount(project: Project, requirements: Requirement[]) {
+  const requirementIds = new Set(requirements.map((requirement) => requirement.id));
+
+  return getStore().requirementStatusHistories.filter(
+    (history) =>
+      requirementIds.has(history.entityId) &&
+      (history.reason.includes("需求内容变更") || history.reason.includes("二次评审"))
+  ).length;
+}
+
+function getUserTodoBacklogCount(currentUser: StoredUser, project: Project, tasks: Task[], requirements: Requirement[]) {
+  const requirementIds = new Set(requirements.map((requirement) => requirement.id));
+  const activeTaskCount = tasks.filter(
+    (task) =>
+      task.assigneeId === currentUser.id &&
+      !["DONE", "CANCELED"].includes(task.status)
+  ).length;
+  const reviewTodoCount = getStore().reviewNodes.filter((node) => {
+    if (node.approverId !== currentUser.id || node.status !== "IN_PROGRESS") {
+      return false;
+    }
+
+    const flow = getStore().reviewFlows.find((item) => item.id === node.flowId);
+    return Boolean(flow && requirementIds.has(flow.requirementId));
+  }).length;
+  const ownerTodoCount =
+    project.ownerId === currentUser.id
+      ? tasks.filter((task) => !["DONE", "CANCELED"].includes(task.status)).length
+      : 0;
+
+  return activeTaskCount + reviewTodoCount + ownerTodoCount;
+}
+
+function buildProjectMonitoring(
+  project: Project,
+  tasks: Task[],
+  requirements: Requirement[],
+  currentUser: StoredUser
+): Pick<
+  ProjectView,
+  "health" | "warningSignals" | "riskSummary" | "riskCount" | "todoBacklogCount" | "lastActiveAt"
+> {
+  const now = Date.now();
+  const blockedTasks = tasks.filter((task) => task.status === "BLOCKED");
+  const overdueTasks = tasks.filter((task) => {
+    if (!task.dueDate || ["DONE", "CANCELED"].includes(task.status)) {
+      return false;
+    }
+
+    return new Date(`${task.dueDate}T23:59:59.999Z`).getTime() < now;
+  });
+  const unresolvedDependencyTasks = tasks.filter((task) =>
+    task.dependencyTaskIds.some((dependencyTaskId) => {
+      const dependency = tasks.find((item) => item.id === dependencyTaskId);
+      return dependency && !["DONE", "CANCELED"].includes(dependency.status);
+    })
+  );
+  const assigneeActiveTaskCount = new Map<string, number>();
+  tasks
+    .filter((task) => !["DONE", "CANCELED"].includes(task.status))
+    .forEach((task) => assigneeActiveTaskCount.set(task.assigneeId, (assigneeActiveTaskCount.get(task.assigneeId) ?? 0) + 1));
+  const resourceConflictCount = Array.from(assigneeActiveTaskCount.values()).filter((count) => count > 2).length;
+  const changeCount = getProjectChangeCount(project, requirements);
+  const lastActiveAt = getLastActiveAt(project, tasks, requirements);
+  const staleDays = (now - new Date(lastActiveAt).getTime()) / (24 * 60 * 60 * 1000);
+  const warningSignals = [
+    changeCount > 0 ? `需求变更 ${changeCount} 次` : "",
+    overdueTasks.length > 0 ? `延期任务 ${overdueTasks.length} 个` : "",
+    resourceConflictCount > 0 ? `资源冲突 ${resourceConflictCount} 处` : "",
+    unresolvedDependencyTasks.length > 0 ? `依赖未完成 ${unresolvedDependencyTasks.length} 个` : "",
+    staleDays > 3 ? "超过三天无进度" : ""
+  ].filter(Boolean);
+  const health: ProjectHealth =
+    project.status === "BLOCKED" || blockedTasks.length > 0 || overdueTasks.length > 0
+      ? "RED"
+      : warningSignals.length > 0
+        ? "YELLOW"
+        : "GREEN";
+  const riskSummary =
+    warningSignals.length > 0
+      ? warningSignals.slice(0, 3).join("；")
+      : "暂无明显风险";
+
+  return {
+    health,
+    warningSignals,
+    riskSummary,
+    riskCount: blockedTasks.length + overdueTasks.length + resourceConflictCount + unresolvedDependencyTasks.length,
+    todoBacklogCount: getUserTodoBacklogCount(currentUser, project, tasks, requirements),
+    lastActiveAt
+  };
+}
+
 export function toProjectView(project: Project, currentUser: StoredUser): ProjectView {
   const { tasks, stats, completionRate } = getProjectTaskStats(project.id);
+  const requirements = getProjectRequirements(project);
+  const monitoring = buildProjectMonitoring(project, tasks, requirements, currentUser);
   const participantDepartments = project.participantDepartmentIds
     .map((departmentId) => summarizeDepartment(departmentId))
     .filter((department): department is Pick<Department, "id" | "name" | "code"> =>
@@ -328,13 +504,21 @@ export function toProjectView(project: Project, currentUser: StoredUser): Projec
   return {
     ...project,
     requirement: summarizeRequirement(project.requirementId),
+    requirements: summarizeProjectRequirements(project),
     owner: summarizeUser(project.ownerId),
     creator: summarizeUser(project.createdBy),
     participantDepartments,
     progress: completionRate,
     taskStats: stats,
     taskCompletionRate: completionRate,
-    riskCount: tasks.filter((task) => task.status === "BLOCKED").length,
+    riskCount: monitoring.riskCount,
+    requirementCount: requirements.length,
+    memberCount: getProjectMemberCount(project, requirements),
+    health: monitoring.health,
+    warningSignals: monitoring.warningSignals,
+    riskSummary: monitoring.riskSummary,
+    todoBacklogCount: monitoring.todoBacklogCount,
+    lastActiveAt: monitoring.lastActiveAt,
     availableActions: projectAvailableActions(project, currentUser)
   };
 }
@@ -389,6 +573,7 @@ function parseListFilter(value?: string) {
 }
 
 export function listProjects(query: ProjectListQuery, currentUser: StoredUser) {
+  assertCanEnterProjectSpace(currentUser);
   const statusFilter = parseListFilter(query.status);
   const ownerId = normalizeString(query.ownerId);
   const departmentId = normalizeString(query.departmentId);
@@ -423,17 +608,28 @@ export function listProjects(query: ProjectListQuery, currentUser: StoredUser) {
     .map((project) => toProjectView(project, currentUser));
 }
 
+export function listProjectOptions(): ProjectOption[] {
+  return getStore()
+    .projects.slice()
+    .sort((left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime())
+    .map((project) => ({
+      id: project.id,
+      code: project.code,
+      name: project.name,
+      status: project.status,
+      requirementId: project.requirementId,
+      plannedReleaseDate: project.plannedReleaseDate
+    }));
+}
+
 function generateProjectCode() {
-  const now = new Date();
-  const datePart = now.toISOString().slice(0, 10).replaceAll("-", "");
-  const prefix = `PROJ-${datePart}-`;
   const maxSerial = getStore()
-    .projects.filter((project) => project.code.startsWith(prefix))
-    .map((project) => Number(project.code.slice(prefix.length)))
+    .projects.map((project) => /^P(\d+)$/.exec(project.code)?.[1])
+    .map((serial) => Number(serial))
     .filter((value) => Number.isFinite(value))
     .reduce((max, value) => Math.max(max, value), 0);
 
-  return `${prefix}${String(maxSerial + 1).padStart(4, "0")}`;
+  return `P${maxSerial + 1}`;
 }
 
 function generateTaskCode() {
@@ -466,6 +662,7 @@ function normalizeParticipantDepartments(requirement: Requirement, input: Projec
 }
 
 export function createProject(input: ProjectCreateInput, currentUser: StoredUser, traceId: string) {
+  assertCanEnterProjectSpace(currentUser);
   const requirement = requireRequirement(input.requirementId);
 
   if (requirement.status !== "APPROVED") {
@@ -503,6 +700,7 @@ export function createProject(input: ProjectCreateInput, currentUser: StoredUser
 
   const fromStatus = requirement.status;
   requirement.status = "SCHEDULED";
+  requirement.projectId = project.id;
   requirement.updatedAt = now;
   appendStatusHistory(requirement, fromStatus, requirement.status, currentUser.id, "创建项目空间");
   writeAuditLog({
@@ -518,6 +716,7 @@ export function createProject(input: ProjectCreateInput, currentUser: StoredUser
 }
 
 export function getProject(projectId: string, currentUser: StoredUser) {
+  assertCanEnterProjectSpace(currentUser);
   return toProjectView(requireProject(projectId), currentUser);
 }
 
@@ -527,6 +726,7 @@ export function updateProject(
   currentUser: StoredUser,
   traceId: string
 ) {
+  assertCanEnterProjectSpace(currentUser);
   const project = requireProject(projectId);
 
   if (!canManageProject(currentUser, project)) {
@@ -629,6 +829,7 @@ function notifyProjectParticipants(project: Project, title: string, content: str
 }
 
 export function startProject(projectId: string, currentUser: StoredUser, traceId: string) {
+  assertCanEnterProjectSpace(currentUser);
   const project = transitionProject(
     requireProject(projectId),
     "IN_PROGRESS",
@@ -636,20 +837,21 @@ export function startProject(projectId: string, currentUser: StoredUser, traceId
     traceId,
     "启动项目"
   );
-  const requirement = requireRequirement(project.requirementId);
-
-  if (["SCHEDULED", "APPROVED"].includes(requirement.status)) {
-    const fromStatus = requirement.status;
-    requirement.status = "IN_DEVELOPMENT";
-    requirement.updatedAt = new Date().toISOString();
-    appendStatusHistory(requirement, fromStatus, requirement.status, currentUser.id, "项目启动");
-  }
+  getProjectRequirements(project).forEach((requirement) => {
+    if (["SCHEDULED", "APPROVED"].includes(requirement.status)) {
+      const fromStatus = requirement.status;
+      requirement.status = "IN_DEVELOPMENT";
+      requirement.updatedAt = new Date().toISOString();
+      appendStatusHistory(requirement, fromStatus, requirement.status, currentUser.id, "项目启动");
+    }
+  });
 
   notifyProjectParticipants(project, "项目已启动", `${project.name} 已进入执行阶段。`);
   return toProjectView(project, currentUser);
 }
 
 export function completeProject(projectId: string, currentUser: StoredUser, traceId: string) {
+  assertCanEnterProjectSpace(currentUser);
   const project = transitionProject(
     requireProject(projectId),
     "DONE",
@@ -717,6 +919,7 @@ function appendTaskStatusHistory(
 }
 
 export function listProjectTasks(projectId: string, currentUser: StoredUser): ProjectTaskBoard {
+  assertCanEnterProjectSpace(currentUser);
   requireProject(projectId);
   const items = getStore()
     .tasks.filter((task) => task.projectId === projectId)
@@ -742,10 +945,11 @@ export function createTask(
   currentUser: StoredUser,
   traceId: string
 ) {
+  assertCanEnterProjectSpace(currentUser);
   const project = requireProject(projectId);
 
   if (!canManageProject(currentUser, project)) {
-    throw forbidden("只有项目负责人、产品经理、项目经理或管理员可以创建任务");
+    throw forbidden("只有项目负责人、职能负责人、产品经理、项目经理或管理员可以创建任务");
   }
 
   assertTaskInput(input);
@@ -1185,7 +1389,7 @@ function decideRequirementBoardColumn(
   return null;
 }
 
-export function getRequirementTaskBoard(currentUser: StoredUser): RequirementTaskBoard {
+export function getRequirementTaskBoard(currentUser: StoredUser, projectId?: string): RequirementTaskBoard {
   const columns: RequirementTaskBoard["columns"] = {
     TODO: [],
     IN_PROGRESS: [],
@@ -1195,6 +1399,7 @@ export function getRequirementTaskBoard(currentUser: StoredUser): RequirementTas
 
   getStore()
     .requirements.filter((requirement) => requirement.status !== "DRAFT")
+    .filter((requirement) => !projectId || requirement.projectId === projectId)
     .forEach((requirement) => {
       const decision = decideRequirementBoardColumn(requirement, currentUser);
 

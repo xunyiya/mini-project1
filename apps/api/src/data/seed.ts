@@ -367,7 +367,7 @@ function seedProject(
   return {
     ...input,
     id: `proj_seed_${serial}`,
-    code: `PROJ-20260517-${serial}`,
+    code: `P${index}`,
     createdAt,
     updatedAt: createdAt,
     isSeed: true
@@ -902,6 +902,7 @@ export function buildDemoData(): DemoData {
       type: "DATA",
       priority: "P1",
       status: "APPROVED",
+      projectId: "proj_seed_0001",
       departmentId: "dept_management",
       ownerId: "user_pm",
       submitterId: "user_executive",
@@ -938,6 +939,7 @@ export function buildDemoData(): DemoData {
       type: "ACTIVITY",
       priority: "P2",
       status: "APPROVED",
+      projectId: "proj_seed_0002",
       departmentId: "dept_business",
       ownerId: "user_product_assistant",
       submitterId: "user_ops_service",
@@ -956,6 +958,7 @@ export function buildDemoData(): DemoData {
       type: "FEATURE",
       priority: "P2",
       status: "IN_REVIEW",
+      projectId: "proj_seed_0003",
       departmentId: "dept_project",
       ownerId: "user_project_manager",
       submitterId: "user_project_manager",

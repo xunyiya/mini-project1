@@ -1,4 +1,4 @@
-import type { BugTicketView, ProjectView, RequirementView, SafeUser } from "@collab/shared";
+import type { BugTicketView, ProjectOption, RequirementView, SafeUser } from "@collab/shared";
 import { ArrowLeft } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -18,7 +18,7 @@ export function BugTicketFormPage() {
   const [bugTicket, setBugTicket] = useState<BugTicketView | null>(null);
   const [users, setUsers] = useState<SafeUser[]>([]);
   const [requirements, setRequirements] = useState<RequirementView[]>([]);
-  const [projects, setProjects] = useState<ProjectView[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [form, setForm] = useState<BugFormState>(defaultBugForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -37,14 +37,14 @@ export function BugTicketFormPage() {
         apiClient.bugTicket(id),
         apiClient.users(1, 100),
         apiClient.requirements({ page: 1, pageSize: 100 }),
-        apiClient.projects({ page: 1, pageSize: 100 })
+        apiClient.projectOptions()
       ]);
 
       setBugTicket(detail);
       setForm(bugFormFromTicket(detail));
       setUsers(userPage.items);
       setRequirements(requirementPage.items);
-      setProjects(projectPage.items);
+      setProjects(projectPage);
     } catch (caughtError) {
       setError(caughtError instanceof ApiClientError ? caughtError.message : "bug单加载失败");
     } finally {

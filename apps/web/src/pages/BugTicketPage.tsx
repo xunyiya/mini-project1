@@ -1,4 +1,4 @@
-import type { BugTicketCreateInput, BugTicketView, ProjectView, RequirementView, SafeUser } from "@collab/shared";
+import type { BugTicketCreateInput, BugTicketView, ProjectOption, RequirementView, SafeUser } from "@collab/shared";
 import {
   BUG_SEVERITIES,
   BUG_SEVERITY_LABELS,
@@ -59,7 +59,7 @@ export function BugTicketPage() {
   const [items, setItems] = useState<BugTicketView[]>([]);
   const [users, setUsers] = useState<SafeUser[]>([]);
   const [requirements, setRequirements] = useState<RequirementView[]>([]);
-  const [projects, setProjects] = useState<ProjectView[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [form, setForm] = useState<BugFormState>({
     ...defaultBugForm,
     finderId: me?.user.id ?? ""
@@ -78,12 +78,12 @@ export function BugTicketPage() {
     const [userPage, requirementPage, projectPage] = await Promise.all([
       apiClient.users(1, 100),
       apiClient.requirements({ page: 1, pageSize: 100 }),
-      apiClient.projects({ page: 1, pageSize: 100 })
+      apiClient.projectOptions()
     ]);
 
     setUsers(userPage.items);
     setRequirements(requirementPage.items);
-    setProjects(projectPage.items);
+    setProjects(projectPage);
   }, []);
 
   const loadBugTickets = useCallback(async () => {
@@ -119,7 +119,8 @@ export function BugTicketPage() {
   function resetForm() {
     setForm({
       ...defaultBugForm,
-      finderId: me?.user.id ?? ""
+      finderId: me?.user.id ?? "",
+      projectId: appliedFilters.projectId
     });
     setShowForm(false);
   }
@@ -149,7 +150,8 @@ export function BugTicketPage() {
   function startCreate() {
     setForm({
       ...defaultBugForm,
-      finderId: me?.user.id ?? ""
+      finderId: me?.user.id ?? "",
+      projectId: appliedFilters.projectId
     });
     setShowForm(true);
   }
@@ -188,14 +190,6 @@ export function BugTicketPage() {
 
       <section className="content-band">
         <form className="bug-filters" onSubmit={handleFilterSubmit}>
-          <label className="filter-search">
-            <span>搜索</span>
-            <input
-              value={filters.search}
-              onChange={(event) => setFilters({ ...filters, search: event.target.value })}
-              placeholder="编号、标题、描述"
-            />
-          </label>
           <label>
             <span>项目</span>
             <select
@@ -209,6 +203,14 @@ export function BugTicketPage() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="filter-search">
+            <span>搜索</span>
+            <input
+              value={filters.search}
+              onChange={(event) => setFilters({ ...filters, search: event.target.value })}
+              placeholder="编号、标题、描述"
+            />
           </label>
           <label>
             <span>状态</span>

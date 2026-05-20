@@ -3,7 +3,7 @@ import type {
   BugTicketCreateInput,
   BugTicketUpdateInput,
   BugTicketView,
-  ProjectView,
+  ProjectOption,
   RequirementView,
   SafeUser
 } from "@collab/shared";
@@ -82,7 +82,7 @@ type BugTicketFormProps = {
   form: BugFormState;
   users: SafeUser[];
   requirements: RequirementView[];
-  projects: ProjectView[];
+  projects: ProjectOption[];
   saving: boolean;
   submitLabel: string;
   onCancel: () => void;
@@ -103,11 +103,17 @@ export function BugTicketForm({
 }: BugTicketFormProps) {
   const [relatedUsersOpen, setRelatedUsersOpen] = useState(false);
   const projectOptions = useMemo(
-    () =>
-      form.requirementId
-        ? projects.filter((project) => project.requirementId === form.requirementId)
-        : projects,
-    [form.requirementId, projects]
+    () => {
+      if (!form.requirementId) {
+        return projects;
+      }
+
+      const requirement = requirements.find((item) => item.id === form.requirementId);
+      return projects.filter(
+        (project) => project.requirementId === form.requirementId || requirement?.projectId === project.id
+      );
+    },
+    [form.requirementId, projects, requirements]
   );
   const relatedUserSummary = useMemo(() => {
     const selectedUsers = users
@@ -126,12 +132,16 @@ export function BugTicketForm({
   }, [form.relatedUserIds, users]);
 
   function handleRequirementChange(requirementId: string) {
+    const requirement = requirements.find((item) => item.id === requirementId);
     const currentProject = projects.find((project) => project.id === form.projectId);
 
     onChange({
       ...form,
       requirementId,
-      projectId: currentProject?.requirementId === requirementId ? form.projectId : ""
+      projectId:
+        currentProject?.requirementId === requirementId || currentProject?.id === requirement?.projectId
+          ? form.projectId
+          : requirement?.projectId ?? ""
     });
   }
 

@@ -1,5 +1,6 @@
 import type {
   DepartmentWithLeader,
+  ProjectOption,
   RequirementAttachment,
   RequirementCreateInput,
   RequirementPriority,
@@ -25,7 +26,7 @@ import {
 } from "@collab/shared";
 import { ArrowLeft, ChevronDown, Save, Send } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { StateBlock } from "../components/StateBlock";
 import { ApiClientError, apiClient } from "../lib/api";
 import { useAuth } from "../lib/auth-context";
@@ -43,6 +44,7 @@ type RequirementFormState = {
   type: string;
   priority: string;
   status: string;
+  projectId: string;
   departmentId: string;
   ownerId: string;
   expectedReleaseDate: string;
@@ -114,6 +116,7 @@ const emptyForm: RequirementFormState = {
   type: "",
   priority: "",
   status: "DRAFT",
+  projectId: "",
   departmentId: "",
   ownerId: "",
   expectedReleaseDate: "",
@@ -196,6 +199,7 @@ function formFromRequirement(requirement: RequirementView): RequirementFormState
     type: requirement.type ?? "",
     priority: requirement.priority ?? "",
     status: requirement.status,
+    projectId: requirement.projectId ?? "",
     departmentId: requirement.departmentId ?? "",
     ownerId: requirement.ownerId ?? "",
     expectedReleaseDate: requirement.expectedReleaseDate ?? "",
@@ -230,6 +234,7 @@ function fieldMessage(fieldErrors: FieldErrors, fieldName: string) {
 export function RequirementFormPage({ mode }: RequirementFormPageProps) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { me } = useAuth();
   const [form, setForm] = useState<RequirementFormState>({
     ...emptyForm,
@@ -241,6 +246,7 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
   const [requirement, setRequirement] = useState<RequirementView | null>(null);
   const [departments, setDepartments] = useState<DepartmentWithLeader[]>([]);
   const [users, setUsers] = useState<SafeUser[]>([]);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [loading, setLoading] = useState(mode === "edit");
   const [saving, setSaving] = useState<"draft" | "submit" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -336,14 +342,17 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
     setError(null);
 
     try {
-      const [departmentPage, userPage, detail] = await Promise.all([
+      const initialProjectId = searchParams.get("projectId") ?? "";
+      const [departmentPage, userPage, projectOptions, detail] = await Promise.all([
         apiClient.departments(1, 100),
         apiClient.users(1, 100),
+        apiClient.projectOptions(),
         mode === "edit" && id ? apiClient.requirement(id) : Promise.resolve(null)
       ]);
 
       setDepartments(departmentPage.items);
       setUsers(userPage.items);
+      setProjects(projectOptions);
 
       if (detail) {
         setRequirement(detail);
@@ -353,6 +362,7 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
         setForm({
           ...emptyForm,
           projectMembers: emptyProjectMemberMap(),
+          projectId: initialProjectId,
           departmentId: me?.user.departmentId ?? "",
           ownerId: me?.user.id ?? "",
           reviewApproverAssignments: defaultReviewAssignments(
@@ -368,7 +378,7 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [id, me?.user.departmentId, me?.user.id, mode]);
+  }, [id, me?.user.departmentId, me?.user.id, mode, searchParams]);
 
   useEffect(() => {
     void loadData();
@@ -471,6 +481,7 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
       source: form.source ? (form.source as RequirementSource) : undefined,
       type: form.type ? (form.type as RequirementType) : undefined,
       priority: form.priority ? (form.priority as RequirementPriority) : undefined,
+      projectId: form.projectId || undefined,
       departmentId: form.departmentId || undefined,
       ownerId: form.ownerId || undefined,
       expectedReleaseDate: form.expectedReleaseDate || undefined,
@@ -665,6 +676,24 @@ export function RequirementFormPage({ mode }: RequirementFormPageProps) {
               {canEditStatus ? <small>可选择任意需求状态</small> : null}
             </label>
           ) : null}
+          <label>
+            <span>所属项目</span>
+            <select
+              value={form.projectId}
+              onChange={(event) => setForm({ ...form, projectId: event.target.value })}
+              disabled={!canEditBaseFields}
+            >
+              <option value="">暂不归属项目</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.code} · {project.name}
+                </option>
+              ))}
+            </select>
+            {fieldMessage(fieldErrors, "projectId") ? (
+              <small>{fieldMessage(fieldErrors, "projectId")}</small>
+            ) : null}
+          </label>
           <label>
             <span>提出部门</span>
             <select

@@ -1,4 +1,5 @@
 import type {
+  ProjectOption,
   RequirementPriority,
   RequirementStatus,
   RequirementTaskBoard,
@@ -135,6 +136,8 @@ function BoardCard({ item }: { item: RequirementTaskBoardItem }) {
 
 export function MyTasksPage() {
   const [board, setBoard] = useState<RequirementTaskBoard>(emptyBoard);
+  const [projects, setProjects] = useState<ProjectOption[]>([]);
+  const [projectId, setProjectId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -143,17 +146,23 @@ export function MyTasksPage() {
     setError(null);
 
     try {
-      setBoard(await apiClient.requirementTaskBoard());
+      setBoard(await apiClient.requirementTaskBoard({ projectId }));
     } catch (caughtError) {
       setError(caughtError instanceof ApiClientError ? caughtError.message : "任务看板加载失败");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     void loadBoard();
   }, [loadBoard]);
+
+  useEffect(() => {
+    void apiClient.projectOptions().then(setProjects).catch(() => {
+      setError("项目选项加载失败");
+    });
+  }, []);
 
   const total = Object.values(board.counts).reduce((sum, count) => sum + count, 0);
 
@@ -165,7 +174,20 @@ export function MyTasksPage() {
             <span className="eyebrow">任务看板</span>
             <h2>我的需求协同事项</h2>
           </div>
-          <span>共 {total} 项</span>
+          <div className="row-actions">
+            <label className="inline-select-field">
+              <span>项目</span>
+              <select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+                <option value="">全部项目</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.code} · {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <span>共 {total} 项</span>
+          </div>
         </div>
         {error ? <div className="form-error">{error}</div> : null}
       </section>

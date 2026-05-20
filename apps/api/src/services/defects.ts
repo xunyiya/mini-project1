@@ -120,7 +120,7 @@ function assertRequirementProject(requirementId: string, projectId: string) {
     throw badRequest("对应项目不存在");
   }
 
-  if (project.requirementId !== requirementId) {
+  if (project.requirementId !== requirementId && requirement.projectId !== projectId) {
     throw badRequest("对应项目必须属于所选需求");
   }
 }

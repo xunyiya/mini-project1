@@ -50,12 +50,25 @@ const buttonActionMap: Record<string, Array<{ code: string; action: string }>> =
 
 const departmentLeaderPermissions = [
   "menu.people.manage",
+  "menu.projects.view",
+  "api.projects.read",
+  "api.projects.create",
+  "api.projects.update",
   "api.users.read",
   "api.users.create",
   "api.users.delete",
+  "button.projects.create",
   "button.people.create",
   "button.people.delete"
 ];
+
+const projectSpacePermissionCodes = new Set([
+  "menu.projects.view",
+  "api.projects.read",
+  "api.projects.create",
+  "api.projects.update",
+  "button.projects.create"
+]);
 
 export const reservedFieldPermissions: FieldPermissionSummary = {
   enabled: false,
@@ -132,11 +145,18 @@ export function assertCanManageDepartment(user: StoredUser, departmentId: string
 }
 
 export function getPermissionCodes(user: StoredUser) {
-  const dynamicPermissions = getManagedDepartmentIds(user).length > 0 ? departmentLeaderPermissions : [];
+  const managedDepartmentIds = getManagedDepartmentIds(user);
+  const dynamicPermissions = managedDepartmentIds.length > 0 ? departmentLeaderPermissions : [];
+  const permissionCodes = new Set([
+    ...getUserRoles(user).flatMap((role) => role.permissionCodes),
+    ...dynamicPermissions
+  ]);
 
-  return Array.from(
-    new Set([...getUserRoles(user).flatMap((role) => role.permissionCodes), ...dynamicPermissions])
-  ).sort();
+  if (!isAdmin(user) && managedDepartmentIds.length === 0) {
+    projectSpacePermissionCodes.forEach((permissionCode) => permissionCodes.delete(permissionCode));
+  }
+
+  return Array.from(permissionCodes).sort();
 }
 
 export function hasPermission(user: StoredUser, permissionCode: string) {

@@ -59,6 +59,25 @@ function formatProgress(project: ProjectView) {
   return `${project.taskStats.DONE}/${Object.values(project.taskStats).reduce((total, count) => total + count, 0)}`;
 }
 
+function formatDateTime(value?: string) {
+  if (!value) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+const healthLabels: Record<ProjectView["health"], string> = {
+  GREEN: "绿灯",
+  YELLOW: "黄灯",
+  RED: "红灯"
+};
+
 export function ProjectListPage() {
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState(defaultFilters);
@@ -393,10 +412,11 @@ export function ProjectListPage() {
                 <div className="project-row-main">
                   <div>
                     <Link className="requirement-title" to={`/projects/${project.id}`}>
-                      {project.name}
+                      {project.code} · {project.name}
                     </Link>
                     <span className="muted-text">
-                      {project.code} · 关联 {project.requirement?.code ?? "-"} · 计划上线 {formatDate(project.plannedReleaseDate)}
+                      关联需求 {project.requirementCount} 条 · 计划上线 {formatDate(project.plannedReleaseDate)} · 最近活跃{" "}
+                      {formatDateTime(project.lastActiveAt)}
                     </span>
                   </div>
                   <span className={`status-pill project-status status-${project.status.toLowerCase()}`}>
@@ -414,9 +434,37 @@ export function ProjectListPage() {
                     任务 <strong>{formatProgress(project)}</strong>
                   </span>
                   <span>
-                    风险 <strong>{project.riskCount}</strong>
+                    成员 <strong>{project.memberCount}</strong>
+                  </span>
+                  <span>
+                    健康度 <strong>{healthLabels[project.health]}</strong>
+                  </span>
+                  <span>
+                    风险 <strong>{project.riskSummary}</strong>
+                  </span>
+                  <span>
+                    待办堆积 <strong>{project.todoBacklogCount}</strong>
                   </span>
                 </div>
+                <div className="project-row-departments">
+                  {project.requirements.slice(0, 4).map((requirement) => (
+                    <Link className="type-pill" key={requirement.id} to={`/requirements/${requirement.id}`}>
+                      {requirement.code} · {requirement.title}
+                    </Link>
+                  ))}
+                  {project.requirements.length > 4 ? (
+                    <span className="type-pill">等 {project.requirements.length} 条需求</span>
+                  ) : null}
+                </div>
+                {project.warningSignals.length > 0 ? (
+                  <div className="project-row-departments">
+                    {project.warningSignals.map((signal) => (
+                      <span className="priority-pill priority-p1" key={signal}>
+                        {signal}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="project-row-departments">
                   {project.participantDepartments.map((department) => (
                     <span className="type-pill" key={department.id}>

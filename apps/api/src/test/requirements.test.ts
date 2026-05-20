@@ -70,6 +70,37 @@ describe("requirements api", () => {
     });
   });
 
+  it("binds a draft requirement to a selected project", async () => {
+    const token = await login("dept_product", "10001");
+
+    const response = await request(app)
+      .post("/api/v1/requirements")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        title: "项目内新建需求",
+        description: "从项目筛选入口创建，并自动归属到选中项目。",
+        projectId: "proj_seed_0001"
+      })
+      .expect(201);
+
+    expect(response.body.data).toMatchObject({
+      title: "项目内新建需求",
+      projectId: "proj_seed_0001",
+      project: {
+        id: "proj_seed_0001",
+        code: "P1",
+        name: "数据指标统一交付项目"
+      }
+    });
+
+    const listResponse = await request(app)
+      .get("/api/v1/requirements?status=DRAFT&projectId=proj_seed_0001&search=项目内新建需求")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(200);
+
+    expect(listResponse.body.data.items).toHaveLength(1);
+  });
+
   it("hides draft requirements from other users", async () => {
     const productToken = await login("dept_product", "10001");
     const developerToken = await login("dept_platform", "10003");

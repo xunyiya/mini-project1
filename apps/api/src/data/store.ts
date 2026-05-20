@@ -85,9 +85,13 @@ function normalizeStore(input: Partial<InMemoryStore>): InMemoryStore {
     notifications: input.notifications ?? fallback.notifications
   };
 
+  normalized.projects = normalizeProjectCodes(normalized.projects);
   normalized.requirements = normalizeRequirementCodes(
     normalized.requirements.map((requirement) => ({
       ...requirement,
+      projectId:
+        requirement.projectId ??
+        normalized.projects.find((project) => project.requirementId === requirement.id)?.id,
       reviewApproverAssignments: requirement.reviewApproverAssignments ?? {},
       projectMembers: requirement.projectMembers ?? [],
       pendingChangeReview: requirement.pendingChangeReview
@@ -126,6 +130,21 @@ function normalizeRequirementCodes(requirements: Requirement[]) {
   });
 
   return normalizedRequirements;
+}
+
+function normalizeProjectCodes(projects: Project[]) {
+  const normalizedProjects = projects.map((project) => ({ ...project }));
+  const sortedProjects = [...normalizedProjects].sort((left, right) => {
+    const timeDiff = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+
+    return timeDiff || left.id.localeCompare(right.id);
+  });
+
+  sortedProjects.forEach((project, index) => {
+    project.code = `P${index + 1}`;
+  });
+
+  return normalizedProjects;
 }
 
 function loadStore() {

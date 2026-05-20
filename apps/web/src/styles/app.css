@@ -661,6 +661,19 @@ textarea {
   padding: 0 14px;
 }
 
+.inline-select-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #66767c;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.inline-select-field select {
+  min-width: 220px;
+}
+
 .muted-text {
   color: #66767c;
   font-size: 13px;
@@ -1467,6 +1480,10 @@ textarea {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.project-row-departments a {
+  text-decoration: none;
 }
 
 .project-row-main,

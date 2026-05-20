@@ -174,6 +174,7 @@ export type Requirement = {
   type?: RequirementType;
   priority?: RequirementPriority;
   status: RequirementStatus;
+  projectId?: string;
   departmentId?: string;
   ownerId?: string;
   submitterId: string;
@@ -208,6 +209,7 @@ export type RequirementView = Requirement & {
   submitter: Pick<SafeUser, "id" | "username" | "displayName" | "title">;
   owner: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
   department: Pick<Department, "id" | "name" | "code"> | null;
+  project: Pick<Project, "id" | "code" | "name" | "status"> | null;
   relatedDepartmentInfos: Array<Pick<Department, "id" | "name" | "code">>;
   availableActions: Array<
     | "view"
@@ -276,6 +278,13 @@ export type Project = {
   isSeed: true;
 };
 
+export type ProjectHealth = "GREEN" | "YELLOW" | "RED";
+
+export type ProjectOption = Pick<
+  Project,
+  "id" | "code" | "name" | "status" | "requirementId" | "plannedReleaseDate"
+>;
+
 export type Task = {
   id: string;
   code: string;
@@ -342,6 +351,7 @@ export type BugTicketView = BugTicket & {
 
 export type ProjectView = Project & {
   requirement: Pick<Requirement, "id" | "code" | "title" | "status"> | null;
+  requirements: Array<Pick<Requirement, "id" | "code" | "title" | "status" | "priority" | "updatedAt">>;
   owner: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
   creator: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
   participantDepartments: Array<Pick<Department, "id" | "name" | "code">>;
@@ -349,6 +359,13 @@ export type ProjectView = Project & {
   taskStats: Record<TaskStatus, number>;
   taskCompletionRate: number;
   riskCount: number;
+  requirementCount: number;
+  memberCount: number;
+  health: ProjectHealth;
+  warningSignals: string[];
+  riskSummary: string;
+  todoBacklogCount: number;
+  lastActiveAt: string;
   availableActions: Array<"view" | "edit" | "start" | "complete" | "createTask">;
 };
 
@@ -530,6 +547,7 @@ export type RequirementCreateInput = {
   source?: RequirementSource;
   type?: RequirementType;
   priority?: RequirementPriority;
+  projectId?: string;
   departmentId?: string;
   ownerId?: string;
   expectedReleaseDate?: string;
@@ -745,7 +763,7 @@ export const REQUIREMENT_STATUS_LABELS: Record<RequirementStatus, string> = {
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   PLANNING: "规划中",
   IN_PROGRESS: "进行中",
-  BLOCKED: "阻塞中",
+  BLOCKED: "暂停",
   DONE: "已完成",
   CANCELED: "已取消",
   ARCHIVED: "已归档"
