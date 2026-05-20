@@ -1,5 +1,6 @@
 import type {
   AuditLog,
+  BugTicket,
   Department,
   Notification,
   Permission,
@@ -33,6 +34,7 @@ export type DemoData = {
   projects: Project[];
   tasks: Task[];
   taskStatusHistories: TaskStatusHistory[];
+  bugTickets: BugTicket[];
   reviewFlows: ReviewFlow[];
   reviewNodes: ReviewNode[];
   workflowTemplates: WorkflowTemplate[];
@@ -67,7 +69,7 @@ const menuPermissions = [
   permission("menu.meetings.view", "查看会议纪要", "menu", "访问会议纪要菜单"),
   permission("menu.risks.view", "查看风险台账", "menu", "访问风险台账菜单"),
   permission("menu.changes.view", "查看变更申请", "menu", "访问变更申请菜单"),
-  permission("menu.defects.view", "查看缺陷处理", "menu", "访问缺陷处理菜单"),
+  permission("menu.defects.view", "查看bug单", "menu", "访问bug单菜单"),
   permission("menu.releases.view", "查看上线计划", "menu", "访问上线计划菜单"),
   permission("menu.notifications.view", "查看消息中心", "menu", "访问消息中心菜单"),
   permission("menu.people.manage", "管理职能成员", "menu", "访问职能成员管理菜单"),
@@ -89,6 +91,9 @@ const apiPermissions = [
   permission("api.tasks.read", "查询任务", "api", "读取项目任务和我的任务"),
   permission("api.tasks.create", "创建任务", "api", "在项目中创建任务"),
   permission("api.tasks.update", "编辑任务", "api", "编辑任务基础字段、状态和依赖"),
+  permission("api.defects.read", "查询bug单", "api", "读取bug单列表和详情"),
+  permission("api.defects.create", "创建bug单", "api", "登记测试和上线过程中的bug"),
+  permission("api.defects.update", "编辑bug单", "api", "维护bug状态、处理人和关联人"),
   permission("api.reviews.read", "查询评审", "api", "读取待评审列表和评审记录"),
   permission("api.reviews.handle", "处理评审", "api", "通过、驳回、补充或转派评审节点"),
   permission("api.workflowTemplates.read", "查询流程模板", "api", "读取流程模板"),
@@ -115,7 +120,8 @@ const buttonPermissions = [
   permission("button.meetings.create", "创建会议", "button", "创建会议纪要"),
   permission("button.risks.create", "创建风险", "button", "登记项目风险"),
   permission("button.changes.create", "创建变更", "button", "发起变更申请"),
-  permission("button.defects.create", "创建缺陷", "button", "登记缺陷"),
+  permission("button.defects.create", "创建bug单", "button", "登记测试和上线过程中的bug"),
+  permission("button.defects.edit", "编辑bug单", "button", "维护bug单"),
   permission("button.releases.approve", "上线审批", "button", "执行上线审批"),
   permission("button.people.create", "创建职能账号", "button", "创建本职能账号"),
   permission("button.people.delete", "删除职能账号", "button", "删除本职能账号"),
@@ -133,18 +139,24 @@ const baseReadPermissions = [
   "menu.profile.view",
   "menu.requirements.view",
   "menu.reviews.view",
+  "menu.defects.view",
   "menu.notifications.view",
   "menu.people.manage",
   "api.requirements.read",
   "api.requirements.create",
   "api.projects.read",
   "api.tasks.read",
+  "api.defects.read",
+  "api.defects.create",
+  "api.defects.update",
   "api.reviews.read",
   "api.workflowTemplates.read",
   "api.users.read",
   "api.departments.read",
   "api.permissions.summary.read",
   "button.requirements.create",
+  "button.defects.create",
+  "button.defects.edit",
   "field.reserved"
 ];
 
@@ -373,6 +385,23 @@ function seedTask(
     ...input,
     id: `task_seed_${serial}`,
     code: `TASK-${serial}`,
+    createdAt,
+    updatedAt: createdAt,
+    isSeed: true
+  };
+}
+
+function seedBugTicket(
+  index: number,
+  input: Omit<BugTicket, "id" | "code" | "createdAt" | "updatedAt" | "isSeed">
+): BugTicket {
+  const serial = String(index).padStart(4, "0");
+  const createdAt = new Date(Date.UTC(2026, 4, 19 + index, 4, index, 0)).toISOString();
+
+  return {
+    ...input,
+    id: `bug_seed_${serial}`,
+    code: `BUG-${serial}`,
     createdAt,
     updatedAt: createdAt,
     isSeed: true
@@ -1237,6 +1266,47 @@ export function buildDemoData(): DemoData {
       createdBy: "user_project_manager"
     })
   ];
+  const bugTickets: BugTicket[] = [
+    seedBugTicket(1, {
+      title: "管理看板筛选后统计数量未同步刷新",
+      severity: "S2",
+      priority: "P1",
+      status: "FIXING",
+      requirementId: "req_seed_0004",
+      projectId: "proj_seed_0001",
+      finderId: "user_qa",
+      handlerId: "user_backend_developer",
+      relatedUserIds: ["user_pm", "user_project_manager"],
+      description: "测试环境中切换部门筛选后，列表数据已变化，但顶部统计仍显示上一次结果。",
+      createdBy: "user_qa"
+    }),
+    seedBugTicket(2, {
+      title: "活动报名页移动端按钮遮挡底部提示",
+      severity: "S3",
+      priority: "P2",
+      status: "PENDING_TEST",
+      requirementId: "req_seed_0006",
+      projectId: "proj_seed_0002",
+      finderId: "user_ops_service",
+      handlerId: "user_developer",
+      relatedUserIds: ["user_designer", "user_qa"],
+      description: "iPhone 13 viewport 下提交按钮固定到底部后遮挡错误提示，需要调整安全区域和滚动留白。",
+      createdBy: "user_ops_service"
+    }),
+    seedBugTicket(3, {
+      title: "风险规则预研项目任务状态归档后仍出现在待办",
+      severity: "S4",
+      priority: "P3",
+      status: "CREATED",
+      requirementId: "req_seed_0007",
+      projectId: "proj_seed_0003",
+      finderId: "user_project_manager",
+      handlerId: "user_developer",
+      relatedUserIds: ["user_qa"],
+      description: "归档状态的任务不应继续进入个人待办列表。",
+      createdBy: "user_project_manager"
+    })
+  ];
   const taskStatusHistories = tasks.flatMap(historyForTask);
 
   return {
@@ -1249,6 +1319,7 @@ export function buildDemoData(): DemoData {
     projects,
     tasks,
     taskStatusHistories,
+    bugTickets,
     reviewFlows,
     reviewNodes,
     workflowTemplates,

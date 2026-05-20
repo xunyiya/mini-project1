@@ -34,7 +34,10 @@ const buttonActionMap: Record<string, Array<{ code: string; action: string }>> =
   meetings: [{ code: "button.meetings.create", action: "create" }],
   risks: [{ code: "button.risks.create", action: "create" }],
   changes: [{ code: "button.changes.create", action: "create" }],
-  defects: [{ code: "button.defects.create", action: "create" }],
+  defects: [
+    { code: "button.defects.create", action: "create" },
+    { code: "button.defects.edit", action: "edit" }
+  ],
   releases: [{ code: "button.releases.approve", action: "approve" }],
   people: [
     { code: "button.people.create", action: "create" },

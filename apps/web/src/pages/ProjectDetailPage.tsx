@@ -283,7 +283,7 @@ export function ProjectDetailPage() {
           <span>会议</span>
           <span>风险</span>
           <span>变更</span>
-          <span>缺陷</span>
+          <span>bug单</span>
           <span>上线计划</span>
         </div>
       </section>

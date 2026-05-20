@@ -1711,6 +1711,191 @@ textarea {
   margin-top: 14px;
 }
 
+.bug-ticket-form {
+  display: grid;
+  gap: 14px;
+  border-top: 1px solid #edf1f2;
+  padding-top: 16px;
+}
+
+.bug-filters {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(4, minmax(140px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.related-user-picker {
+  display: grid;
+  gap: 8px;
+  color: #49545b;
+  font-size: 14px;
+}
+
+.bug-ticket-table {
+  display: grid;
+  border: 1px solid #e1e7ea;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.bug-ticket-table-header,
+.bug-ticket-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 112px 128px minmax(220px, 1fr) minmax(180px, 0.9fr) 118px 98px;
+}
+
+.bug-ticket-table-header {
+  min-height: 36px;
+  align-items: center;
+  border-bottom: 1px solid #e1e7ea;
+  background: #f8fafb;
+  color: #66767c;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.bug-ticket-table-header > *,
+.bug-ticket-row > * {
+  min-width: 0;
+  height: 100%;
+  border-left: 1px solid #e7edf0;
+  padding: 10px 12px;
+}
+
+.bug-ticket-table-header > * {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.bug-ticket-table-header > *:first-child,
+.bug-ticket-row > *:first-child {
+  border-left: 0;
+}
+
+.bug-ticket-row {
+  min-height: 86px;
+  align-items: center;
+  background: #ffffff;
+}
+
+.bug-ticket-row + .bug-ticket-row {
+  border-top: 1px solid #e1e7ea;
+}
+
+.bug-ticket-main,
+.bug-ticket-relation,
+.bug-ticket-people,
+.bug-ticket-date {
+  display: grid;
+  gap: 4px;
+  align-content: center;
+}
+
+.bug-ticket-main strong,
+.bug-ticket-relation a,
+.bug-ticket-relation span,
+.bug-ticket-people span,
+.bug-ticket-date strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bug-ticket-main strong,
+.bug-ticket-relation a {
+  color: #173746;
+  font-weight: 800;
+}
+
+.bug-ticket-main span,
+.bug-ticket-people span,
+.bug-ticket-date span {
+  color: #66767c;
+  font-size: 13px;
+}
+
+.bug-ticket-pills {
+  display: grid;
+  gap: 7px;
+  align-content: center;
+}
+
+.bug-status {
+  width: 100%;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.severity-pill {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7e0e3;
+  border-radius: 14px;
+  background: #f7f9fa;
+  color: #40515a;
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.severity-s1 {
+  border-color: #edb9b1;
+  background: #fff1ef;
+  color: #a43c2f;
+}
+
+.severity-s2 {
+  border-color: #e8c782;
+  background: #fff8e8;
+  color: #7d5512;
+}
+
+.severity-s3 {
+  border-color: #b9d0e2;
+  background: #eef7fc;
+  color: #28566a;
+}
+
+.severity-s4 {
+  border-color: #cbd8ce;
+  background: #f3faf5;
+  color: #2b6542;
+}
+
+.status-created,
+.status-pending_test,
+.status-accepting {
+  border-color: #e8c782;
+  background: #fff8e8;
+  color: #775211;
+}
+
+.status-fixing,
+.status-testing {
+  border-color: #b9d0e2;
+  background: #eef7fc;
+  color: #245a74;
+}
+
+.status-fixed,
+.status-test_done,
+.status-accepted {
+  border-color: #bfd9ca;
+  background: #f2faf5;
+  color: #24563c;
+}
+
+.bug-ticket-actions {
+  align-content: center;
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -1721,6 +1906,11 @@ textarea {
   .requirements-table-header,
   .requirement-row {
     grid-template-columns: minmax(220px, 1fr) 118px 88px 118px minmax(130px, 160px) 104px;
+  }
+
+  .bug-ticket-table-header,
+  .bug-ticket-row {
+    grid-template-columns: minmax(180px, 1fr) 104px 112px minmax(180px, 1fr) minmax(150px, 0.8fr) 104px 88px;
   }
 
   .requirements-table-header span:last-child {
@@ -1773,6 +1963,7 @@ textarea {
   .people-form,
   .people-row,
   .requirement-filters,
+  .bug-filters,
   .review-filters,
   .project-create-form,
   .project-filters,
@@ -1781,6 +1972,7 @@ textarea {
   .task-list-row,
   .task-detail-grid,
   .requirement-row,
+  .bug-ticket-row,
   .review-card,
   .review-node-row,
   .two-columns,
@@ -1792,6 +1984,7 @@ textarea {
   }
 
   .requirement-filters .filter-search,
+  .bug-filters .filter-search,
   .wide-field {
     grid-column: auto;
   }
@@ -1802,6 +1995,10 @@ textarea {
   }
 
   .requirements-table-header {
+    display: none;
+  }
+
+  .bug-ticket-table-header {
     display: none;
   }
 
@@ -1820,7 +2017,17 @@ textarea {
     padding: 8px 14px;
   }
 
+  .bug-ticket-row > * {
+    border-left: 0;
+    border-top: 1px solid #edf1f2;
+    padding: 8px 14px;
+  }
+
   .requirement-row > *:first-child {
+    border-top: 0;
+  }
+
+  .bug-ticket-row > *:first-child {
     border-top: 0;
   }
 

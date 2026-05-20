@@ -233,6 +233,19 @@ export type ProjectStatus =
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "BLOCKED" | "DONE" | "CANCELED";
 
+export type BugSeverity = "S1" | "S2" | "S3" | "S4";
+
+export type BugStatus =
+  | "CREATED"
+  | "FIXING"
+  | "FIXED"
+  | "PENDING_TEST"
+  | "TESTING"
+  | "TEST_DONE"
+  | "ACCEPTING"
+  | "ACCEPTED"
+  | "ARCHIVED";
+
 export type TaskType =
   | "PRODUCT"
   | "DESIGN"
@@ -295,6 +308,36 @@ export type TaskStatusHistory = {
   reason: string;
   createdAt: string;
   isSeed: true;
+};
+
+export type BugTicket = {
+  id: string;
+  code: string;
+  title: string;
+  severity: BugSeverity;
+  priority: RequirementPriority;
+  status: BugStatus;
+  requirementId: string;
+  projectId: string;
+  finderId: string;
+  handlerId: string;
+  relatedUserIds: string[];
+  description: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  archivedAt?: string;
+  isSeed: true;
+};
+
+export type BugTicketView = BugTicket & {
+  requirement: Pick<Requirement, "id" | "code" | "title" | "status"> | null;
+  project: Pick<Project, "id" | "code" | "name" | "status"> | null;
+  finder: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
+  handler: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
+  relatedUsers: Array<Pick<SafeUser, "id" | "username" | "displayName" | "title">>;
+  creator: Pick<SafeUser, "id" | "username" | "displayName" | "title"> | null;
+  availableActions: Array<"view" | "edit">;
 };
 
 export type ProjectView = Project & {
@@ -539,6 +582,23 @@ export type TaskDependenciesInput = {
   dependencyTaskIds: string[];
 };
 
+export type BugTicketCreateInput = {
+  title: string;
+  severity: BugSeverity;
+  priority: RequirementPriority;
+  status?: BugStatus;
+  requirementId: string;
+  projectId: string;
+  finderId: string;
+  handlerId: string;
+  relatedUserIds?: string[];
+  description?: string;
+};
+
+export type BugTicketUpdateInput = Partial<BugTicketCreateInput> & {
+  status?: BugStatus;
+};
+
 export const REQUIREMENT_SOURCES: RequirementSource[] = [
   "CUSTOMER",
   "OPERATION",
@@ -601,6 +661,20 @@ export const TASK_STATUSES: TaskStatus[] = [
   "BLOCKED",
   "DONE",
   "CANCELED"
+];
+
+export const BUG_SEVERITIES: BugSeverity[] = ["S1", "S2", "S3", "S4"];
+
+export const BUG_STATUSES: BugStatus[] = [
+  "CREATED",
+  "FIXING",
+  "FIXED",
+  "PENDING_TEST",
+  "TESTING",
+  "TEST_DONE",
+  "ACCEPTING",
+  "ACCEPTED",
+  "ARCHIVED"
 ];
 
 export const TASK_TYPES: TaskType[] = [
@@ -683,6 +757,25 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   BLOCKED: "阻塞中",
   DONE: "已完成",
   CANCELED: "已取消"
+};
+
+export const BUG_SEVERITY_LABELS: Record<BugSeverity, string> = {
+  S1: "S1 阻断",
+  S2: "S2 严重",
+  S3: "S3 一般",
+  S4: "S4 轻微"
+};
+
+export const BUG_STATUS_LABELS: Record<BugStatus, string> = {
+  CREATED: "已创建",
+  FIXING: "修复中",
+  FIXED: "已修复",
+  PENDING_TEST: "待测试",
+  TESTING: "测试中",
+  TEST_DONE: "测试完成",
+  ACCEPTING: "验收中",
+  ACCEPTED: "已验收",
+  ARCHIVED: "已归档"
 };
 
 export const TASK_TYPE_LABELS: Record<TaskType, string> = {
@@ -868,7 +961,7 @@ export const MENU_ITEMS: MenuItem[] = [
   },
   {
     key: "defects",
-    label: "缺陷处理",
+    label: "bug单",
     path: "/defects",
     permissionCode: "menu.defects.view"
   },

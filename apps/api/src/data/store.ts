@@ -1,5 +1,6 @@
 import type {
   AuditLog,
+  BugTicket,
   Department,
   Notification,
   Permission,
@@ -32,6 +33,7 @@ export type InMemoryStore = {
   projects: Project[];
   tasks: Task[];
   taskStatusHistories: TaskStatusHistory[];
+  bugTickets: BugTicket[];
   reviewFlows: ReviewFlow[];
   reviewNodes: ReviewNode[];
   workflowTemplates: WorkflowTemplate[];
@@ -75,6 +77,7 @@ function normalizeStore(input: Partial<InMemoryStore>): InMemoryStore {
     projects: input.projects ?? fallback.projects,
     tasks: input.tasks ?? fallback.tasks,
     taskStatusHistories: input.taskStatusHistories ?? fallback.taskStatusHistories,
+    bugTickets: input.bugTickets ?? fallback.bugTickets,
     reviewFlows: input.reviewFlows ?? fallback.reviewFlows,
     reviewNodes: input.reviewNodes ?? fallback.reviewNodes,
     workflowTemplates: input.workflowTemplates ?? fallback.workflowTemplates,

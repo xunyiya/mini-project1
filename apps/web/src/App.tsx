@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { MainLayout } from "./components/MainLayout";
 import { AuthProvider } from "./lib/auth-context";
+import { BugTicketPage } from "./pages/BugTicketPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -48,10 +49,7 @@ export function App() {
                 path="changes"
                 element={<PlaceholderPage title="变更申请" moduleKey="changes" />}
               />
-              <Route
-                path="defects"
-                element={<PlaceholderPage title="缺陷处理" moduleKey="defects" />}
-              />
+              <Route path="defects" element={<BugTicketPage />} />
               <Route
                 path="releases"
                 element={<PlaceholderPage title="上线计划" moduleKey="releases" />}

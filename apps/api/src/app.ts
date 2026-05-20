@@ -5,6 +5,7 @@ import { databaseConfig } from "./config/database";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler";
 import { traceMiddleware } from "./middleware/trace";
 import { authRoutes } from "./routes/auth.routes";
+import { defectsRoutes } from "./routes/defects.routes";
 import { departmentsRoutes } from "./routes/departments.routes";
 import { permissionsRoutes } from "./routes/permissions.routes";
 import { projectsRoutes } from "./routes/projects.routes";
@@ -40,6 +41,7 @@ export function createApp() {
   v1.use("/workflow-templates", workflowTemplatesRoutes);
   v1.use("/projects", projectsRoutes);
   v1.use("/tasks", tasksRoutes);
+  v1.use("/defects", defectsRoutes);
 
   app.use(API_PREFIX, v1);
   app.use(notFoundHandler);

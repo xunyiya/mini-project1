@@ -1,6 +1,9 @@
 import type {
   ApiResponse,
   AuthMe,
+  BugTicketCreateInput,
+  BugTicketUpdateInput,
+  BugTicketView,
   ChangePasswordInput,
   CreateUserInput,
   DepartmentWithLeader,
@@ -265,6 +268,33 @@ export const apiClient = {
   setTaskDependencies(taskId: string, input: TaskDependenciesInput) {
     return request<TaskView>(`/tasks/${taskId}/dependencies`, {
       method: "POST",
+      body: JSON.stringify(input)
+    });
+  },
+  bugTickets(params: Record<string, string | number | undefined> = {}) {
+    const searchParams = new URLSearchParams();
+
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") {
+        searchParams.set(key, String(value));
+      }
+    });
+
+    const query = searchParams.toString();
+    return request<PageData<BugTicketView>>(`/defects${query ? `?${query}` : ""}`);
+  },
+  createBugTicket(input: BugTicketCreateInput) {
+    return request<BugTicketView>("/defects", {
+      method: "POST",
+      body: JSON.stringify(input)
+    });
+  },
+  bugTicket(bugTicketId: string) {
+    return request<BugTicketView>(`/defects/${bugTicketId}`);
+  },
+  updateBugTicket(bugTicketId: string, input: BugTicketUpdateInput) {
+    return request<BugTicketView>(`/defects/${bugTicketId}`, {
+      method: "PATCH",
       body: JSON.stringify(input)
     });
   },
